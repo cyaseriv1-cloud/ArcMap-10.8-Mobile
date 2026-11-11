@@ -1,0 +1,122 @@
+package com.terraaxis.core.spatial
+
+import com.terraaxis.core.geometry.BoundingBox
+import com.terraaxis.core.geometry.Point
+import com.terraaxis.core.geometry.Polygon
+import com.terraaxis.core.geometry.Polyline
+import com.terraaxis.core.model.Feature
+
+class SpatialIndex(
+    private val cellSizeDegrees: Double = 0.05
+) {
+    private val grid = HashMap<Pair<Int, Int>, MutableList<Feature>>()
+
+    fun clear() {
+        grid.clear()
+    }
+
+    fun build(features: Collection<Feature>) {
+        clear()
+        features.forEach { insert(it) }
+    }
+
+    fun insert(feature: Feature) {
+        val geom = feature.geometry ?: return
+        val box = geom.boundingBox
+        val minCellX = (box.minX / cellSizeDegrees).toInt()
+        val maxCellX = (box.maxX / cellSizeDegrees).toInt()
+        val minCellY = (box.minY / cellSizeDegrees).toInt()
+        val maxCellY = (box.maxY / cellSizeDegrees).toInt()
+
+        for (cx in minCellX..maxCellX) {
+            for (cy in minCellY..maxCellY) {
+                val cell = grid.getOrPut(Pair(cx, cy)) { mutableListOf() }
+                cell.add(feature)
+            }
+        }
+    }
+
+    /**
+     * Finds candidate features intersecting the given query bounding box.
+     */
+    fun query(box: BoundingBox): List<Feature> {
+        val minCellX = (box.minX / cellSizeDegrees).toInt()
+        val maxCellX = (box.maxX / cellSizeDegrees).toInt()
+        val minCellY = (box.minY / cellSizeDegrees).toInt()
+        val maxCellY = (box.maxY / cellSizeDegrees).toInt()
+
+        val candidates = LinkedHashSet<Feature>()
+        for (cx in minCellX..maxCellX) {
+            for (cy in minCellY..maxCellY) {
+                grid[Pair(cx, cy)]?.let { list ->
+                    for (f in list) {
+                        val geom = f.geometry
+                        if (geom != null && geom.boundingBox.intersects(box)) {
+                            candidates.add(f)
+                        }
+                    }
+                }
+            }
+        }
+        return candidates.toList()
+    }
+
+    /**
+     * Hit-test for map touch: finds the feature under point [touchPoint] within a tolerance [toleranceDegrees].
+     */
+    fun hitTest(touchPoint: Point, toleranceDegrees: Double): Feature? {
+        val searchBox = BoundingBox(
+            touchPoint.x - toleranceDegrees,
+            touchPoint.y - toleranceDegrees,
+            touchPoint.x + toleranceDegrees,
+            touchPoint.y + toleranceDegrees
+        )
+        val candidates = query(searchBox)
+
+        // Test precise geometry:
+        // 1. Point geometries within tolerance distance
+        // 2. Polygon geometries containing point
+        // 3. Polyline geometries with distance <= tolerance
+        for (f in candidates) {
+            when (val geom = f.geometry) {
+                is Point -> {
+                    if (geom.distanceTo(touchPoint) <= toleranceDegrees) return f
+                }
+                is Polygon -> {
+                    if (geom.containsPoint(touchPoint)) return f
+                }
+                is Polyline -> {
+                    if (distancePointToPolyline(touchPoint, geom.points) <= toleranceDegrees) return f
+                }
+                else -> {
+                    if (geom != null && geom.boundingBox.contains(touchPoint)) return f
+                }
+            }
+        }
+        return null
+    }
+
+    private fun distancePointToPolyline(p: Point, points: List<Point>): Double {
+        if (points.size < 2) return Double.MAX_VALUE
+        var minDist = Double.MAX_VALUE
+        for (i in 0 until points.size - 1) {
+            val d = distancePointToSegment(p, points[i], points[i + 1])
+            if (d < minDist) minDist = d
+        }
+        return minDist
+    }
+
+    private fun distancePointToSegment(p: Point, a: Point, b: Point): Double {
+        val dx = b.x - a.x
+        val dy = b.y - a.y
+        val lenSq = dx * dx + dy * dy
+        if (lenSq < 1e-12) return p.distanceTo(a)
+
+        val t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq).coerceIn(0.0, 1.0)
+        val projX = a.x + t * dx
+        val projY = a.y + t * dy
+        val distX = p.x - projX
+        val distY = p.y - projY
+        return kotlin.math.sqrt(distX * distX + distY * distY)
+    }
+}
