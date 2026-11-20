@@ -16,6 +16,7 @@ import {
   bboxExpandBox,
   getGeometryBoundingBox,
   isBBoxEmpty,
+  makeMultiPoint,
   makePoint,
   makePolygonFromRing,
   makePolyline,
@@ -514,7 +515,9 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const performIdentify = useCallback(
     (tapPoint: Point) => {
-      const tolerance = (viewportRef.current.groundMetersPerPixel * 26.0) / 111320.0;
+      const cosLat = Math.max(0.2, Math.cos((tapPoint.y * Math.PI) / 180));
+      const tolerance =
+        (viewportRef.current.groundMetersPerPixel * 26.0) / (111320.0 * cosLat);
       for (const layer of layers) {
         if (!layer.isVisible) continue;
         const index = new SpatialIndex();
@@ -537,7 +540,9 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const performDeleteTap = useCallback(
     (tapPoint: Point) => {
-      const tolerance = (viewportRef.current.groundMetersPerPixel * 26.0) / 111320.0;
+      const cosLat = Math.max(0.2, Math.cos((tapPoint.y * Math.PI) / 180));
+      const tolerance =
+        (viewportRef.current.groundMetersPerPixel * 26.0) / (111320.0 * cosLat);
       const ordered = activeLayer
         ? [activeLayer, ...layers.filter((l) => l.id !== activeLayer.id)]
         : layers;
@@ -575,7 +580,9 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const performSelect = useCallback(
     (tapPoint: Point) => {
-      const tolerance = (viewportRef.current.groundMetersPerPixel * 26.0) / 111320.0;
+      const cosLat = Math.max(0.2, Math.cos((tapPoint.y * Math.PI) / 180));
+      const tolerance =
+        (viewportRef.current.groundMetersPerPixel * 26.0) / (111320.0 * cosLat);
 
       if (activeLayer && activeLayer.isVisible) {
         const index = new SpatialIndex();
@@ -1318,7 +1325,11 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setGpsAccuracy(acc);
       const target = activeLayer;
 
-      if (!target || target.geometryType !== GeometryType.POINT) {
+      if (
+        !target ||
+        (target.geometryType !== GeometryType.POINT &&
+          target.geometryType !== GeometryType.MULTI_POINT)
+      ) {
         const existingGpsLayer = layers.find(
           (l) => l.name === 'Puntos de Campo GPS' && l.geometryType === GeometryType.POINT
         );
@@ -1387,7 +1398,7 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const nextId = target.features.reduce((max, f) => Math.max(max, f.id), 0) + 1;
       setPendingFeatureDraft({
         layerId: target.id,
-        geometry: gps,
+        geometry: target.geometryType === GeometryType.MULTI_POINT ? makeMultiPoint([gps]) : gps,
         nextId,
         isPointCapture: true,
         prefillAttributes: {
@@ -1527,10 +1538,11 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const runSimplify = useCallback(
     (layer: VectorLayer, toleranceMeters: number) => {
-      const degTolerance = toleranceMeters / 111320.0;
+      const safeTol = Math.max(1, Number.isFinite(toleranceMeters) ? toleranceMeters : 50);
+      const degTolerance = safeTol / 111320.0;
       const simplified = SimplifyLineTool.execute(layer, degTolerance);
       addLayer(simplified);
-      setStatusMessage(`Capa simplificada (Ramer-Douglas-Peucker ${toleranceMeters}m)`);
+      setStatusMessage(`Capa simplificada (Ramer-Douglas-Peucker ${Math.round(safeTol)}m)`);
     },
     [addLayer]
   );

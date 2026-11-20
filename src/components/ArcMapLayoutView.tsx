@@ -145,7 +145,7 @@ export const ArcMapLayoutView: React.FC = () => {
               setTitleDraft(layoutTitle);
               setShowTitleDialog(true);
             }}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs border border-[#909090] bg-white hover:bg-gray-100 text-black rounded-[3px] cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 sm:px-2.5 sm:py-1 text-xs border border-[#909090] bg-white hover:bg-gray-100 text-black rounded-[3px] cursor-pointer"
           >
             <Edit3 className="w-3.5 h-3.5" />
             <span>{isEs ? 'Título' : 'Title'}</span>
@@ -154,7 +154,7 @@ export const ArcMapLayoutView: React.FC = () => {
           <button
             type="button"
             onClick={handleExportPng}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-[#0079C1] hover:bg-[#00639E] text-white font-semibold rounded-[3px] cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 sm:px-2.5 sm:py-1 text-xs bg-[#0079C1] hover:bg-[#00639E] text-white font-semibold rounded-[3px] cursor-pointer"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>{isEs ? 'Exportar' : 'Export'}</span>
@@ -249,7 +249,7 @@ export const ArcMapLayoutView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTitleDialog(false)}
-                className="px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
+                className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-[13px] sm:text-xs text-gray-700 hover:bg-gray-100 rounded border border-gray-300 cursor-pointer"
               >
                 {isEs ? 'Cancelar' : 'Cancel'}
               </button>
@@ -259,7 +259,7 @@ export const ArcMapLayoutView: React.FC = () => {
                   setLayoutTitle(titleDraft);
                   setShowTitleDialog(false);
                 }}
-                className="px-3 py-1.5 text-xs bg-[#0079C1] text-white font-semibold rounded cursor-pointer"
+                className="px-5 py-2.5 sm:px-3 sm:py-1.5 text-[13px] sm:text-xs bg-[#0079C1] text-white font-semibold rounded cursor-pointer"
               >
                 {isEs ? 'Aceptar' : 'Accept'}
               </button>

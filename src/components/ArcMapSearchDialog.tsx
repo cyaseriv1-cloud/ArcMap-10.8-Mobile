@@ -90,7 +90,7 @@ export const ArcMapSearchDialog: React.FC = () => {
           <button
             type="button"
             onClick={() => toggleSearch(false)}
-            className="p-1 rounded hover:bg-black/10 cursor-pointer"
+            className="p-2 sm:p-1 rounded hover:bg-black/10 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -107,7 +107,7 @@ export const ArcMapSearchDialog: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelectedTab(0)}
-              className={`py-1.5 text-xs rounded cursor-pointer transition-colors ${
+              className={`py-2.5 sm:py-1.5 text-xs rounded cursor-pointer transition-colors ${
                 selectedTab === 0
                   ? isDark
                     ? 'bg-[#1E222B] text-[#64B5F6] font-bold shadow-xs'
@@ -120,7 +120,7 @@ export const ArcMapSearchDialog: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelectedTab(1)}
-              className={`py-1.5 text-xs rounded cursor-pointer transition-colors ${
+              className={`py-2.5 sm:py-1.5 text-xs rounded cursor-pointer transition-colors ${
                 selectedTab === 1
                   ? isDark
                     ? 'bg-[#1E222B] text-[#64B5F6] font-bold shadow-xs'
@@ -188,7 +188,7 @@ export const ArcMapSearchDialog: React.FC = () => {
                     key={chip}
                     type="button"
                     onClick={() => setSearchQuery(chip === 'Uvima 7' ? 'Uvima' : chip)}
-                    className={`px-2 py-0.5 text-[11px] rounded border cursor-pointer ${
+                    className={`px-3 py-1.5 sm:px-2 sm:py-0.5 text-xs sm:text-[11px] rounded border cursor-pointer ${
                       isDark
                         ? 'bg-[#282E3A] border-[#384252] hover:bg-[#30363D]'
                         : 'bg-slate-100 border-slate-300 hover:bg-slate-200'
@@ -210,7 +210,7 @@ export const ArcMapSearchDialog: React.FC = () => {
                     key={chip.label}
                     type="button"
                     onClick={() => handleQuickWorldChip(chip.query)}
-                    className={`px-2 py-0.5 text-[11px] rounded border cursor-pointer ${
+                    className={`px-3 py-1.5 sm:px-2 sm:py-0.5 text-xs sm:text-[11px] rounded border cursor-pointer ${
                       isDark
                         ? 'bg-[#282E3A] border-[#384252] hover:bg-[#30363D]'
                         : 'bg-slate-100 border-slate-300 hover:bg-slate-200'
@@ -318,7 +318,7 @@ export const ArcMapSearchDialog: React.FC = () => {
           <button
             type="button"
             onClick={() => toggleSearch(false)}
-            className="px-3 py-1 text-xs font-bold text-[#0079C1] hover:bg-[#0079C1]/10 rounded cursor-pointer"
+            className="px-4 py-2 sm:px-3 sm:py-1 text-[13px] sm:text-xs font-bold text-[#0079C1] hover:bg-[#0079C1]/10 rounded cursor-pointer"
           >
             {isEs ? 'Cerrar' : 'Close'}
           </button>

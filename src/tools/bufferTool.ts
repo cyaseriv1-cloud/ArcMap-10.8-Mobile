@@ -24,14 +24,17 @@ export const BufferTool = {
   execute(
     inputLayer: VectorLayer,
     distanceMeters: number,
-    outputLayerName = `${inputLayer.name}_buffer_${Math.round(distanceMeters)}m`
+    outputLayerName?: string
   ): VectorLayer {
+    const safeDist = Math.max(1, Number.isFinite(distanceMeters) ? distanceMeters : 100);
+    const layerName =
+      outputLayerName ?? `${inputLayer.name}_buffer_${Math.round(safeDist)}m`;
     const outFeatures: Feature[] = [];
 
     inputLayer.features.forEach((feat, idx) => {
       const geom = feat.geometry;
       if (!geom) return;
-      const bufferedGeom = bufferGeometry(geom, distanceMeters);
+      const bufferedGeom = bufferGeometry(geom, safeDist);
       if (!bufferedGeom) return;
 
       outFeatures.push({
@@ -39,7 +42,7 @@ export const BufferTool = {
         geometry: bufferedGeom,
         attributes: {
           ...feat.attributes,
-          BUFF_DIST: distanceMeters,
+          BUFF_DIST: safeDist,
         },
       });
     });
@@ -49,9 +52,13 @@ export const BufferTool = {
       outFields.push(makeField('BUFF_DIST', FieldType.DOUBLE));
     }
 
+    const hasMultiPolygon = outFeatures.some(
+      (f) => f.geometry?.geometryType === GeometryType.MULTI_POLYGON
+    );
+
     return createVectorLayer({
-      name: outputLayerName,
-      geometryType: GeometryType.POLYGON,
+      name: layerName,
+      geometryType: hasMultiPolygon ? GeometryType.MULTI_POLYGON : GeometryType.POLYGON,
       symbology: createSimpleSymbology({
         fillColor: makeColor(255, 167, 38, 0.45),
         strokeColor: makeColor(239, 108, 0),
@@ -147,21 +154,26 @@ function bufferPolygon(polygon: Polygon, distanceMeters: number): Polygon | null
 
   const latAvg = extRing.reduce((s, p) => s + p.y, 0) / extRing.length;
   const latRad = (latAvg * Math.PI) / 180.0;
-  const degLat = distanceMeters / 111320.0;
-  const degLon = distanceMeters / (111320.0 * Math.max(0.001, Math.cos(latRad)));
+  const mPerDegLat = 111320.0;
+  const mPerDegLon = 111320.0 * Math.max(0.001, Math.cos(latRad));
 
   const centroid = polygonCentroid(polygon);
   const expandedRing: Point[] = [];
 
   for (const pt of extRing) {
-    const dx = pt.x - centroid.x;
-    const dy = pt.y - centroid.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 1e-9) {
+    const dxMeters = (pt.x - centroid.x) * mPerDegLon;
+    const dyMeters = (pt.y - centroid.y) * mPerDegLat;
+    const distMeters = Math.sqrt(dxMeters * dxMeters + dyMeters * dyMeters);
+    if (distMeters < 1e-6) {
       expandedRing.push(pt);
     } else {
-      const factor = (dist + Math.max(degLon, degLat)) / dist;
-      expandedRing.push(makePoint(centroid.x + dx * factor, centroid.y + dy * factor));
+      const factor = (distMeters + distanceMeters) / distMeters;
+      expandedRing.push(
+        makePoint(
+          centroid.x + (dxMeters * factor) / mPerDegLon,
+          centroid.y + (dyMeters * factor) / mPerDegLat
+        )
+      );
     }
   }
 

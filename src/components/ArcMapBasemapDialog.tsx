@@ -84,7 +84,7 @@ export const ArcMapBasemapDialog: React.FC = () => {
           <button
             type="button"
             onClick={closeBasemapDialog}
-            className="p-1 rounded hover:bg-black/10 cursor-pointer"
+            className="p-2 sm:p-1 rounded hover:bg-black/10 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -149,7 +149,7 @@ export const ArcMapBasemapDialog: React.FC = () => {
           <button
             type="button"
             onClick={closeBasemapDialog}
-            className="px-3 py-1 text-xs font-bold text-[#0079C1] hover:bg-[#0079C1]/10 rounded cursor-pointer"
+            className="px-4 py-2 sm:px-3 sm:py-1 text-[13px] sm:text-xs font-bold text-[#0079C1] hover:bg-[#0079C1]/10 rounded cursor-pointer"
           >
             {isEs ? 'Cerrar' : 'Close'}
           </button>

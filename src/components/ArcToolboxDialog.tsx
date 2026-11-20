@@ -124,7 +124,7 @@ export const ArcToolboxDialog: React.FC = () => {
           <button
             type="button"
             onClick={handleClose}
-            className="p-1 rounded hover:bg-black/10 cursor-pointer"
+            className="p-2 sm:p-1 rounded hover:bg-black/10 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -212,9 +212,9 @@ export const ArcToolboxDialog: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedTool(ToolboxTool.NONE)}
-                className="flex items-center gap-1 text-[#0079C1] font-semibold text-xs hover:underline w-fit cursor-pointer"
+                className="flex items-center gap-1.5 py-1.5 sm:py-0 text-[#0079C1] font-semibold text-xs hover:underline w-fit cursor-pointer"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
+                <ArrowLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                 <span>
                   {isEs
                     ? 'Volver al árbol de ArcToolbox'
@@ -350,7 +350,7 @@ export const ArcToolboxDialog: React.FC = () => {
           <button
             type="button"
             onClick={handleClose}
-            className={`px-3 py-1.5 text-xs rounded border cursor-pointer ${
+            className={`px-4 py-2.5 sm:px-3 sm:py-1.5 text-[13px] sm:text-xs rounded border cursor-pointer ${
               isDark
                 ? 'border-[#384252] text-gray-300 hover:bg-[#282E3A]'
                 : 'border-gray-300 text-gray-700 hover:bg-gray-100'
@@ -370,7 +370,7 @@ export const ArcToolboxDialog: React.FC = () => {
               type="button"
               disabled={!targetLayer}
               onClick={handleExecute}
-              className="px-4 py-1.5 text-xs rounded bg-[#0079C1] hover:bg-[#00639E] text-white font-bold disabled:opacity-40 cursor-pointer"
+              className="px-5 py-2.5 sm:px-4 sm:py-1.5 text-[13px] sm:text-xs rounded bg-[#0079C1] hover:bg-[#00639E] text-white font-bold disabled:opacity-40 cursor-pointer"
             >
               OK ({isEs ? 'Ejecutar' : 'Run'})
             </button>
@@ -396,7 +396,7 @@ const ToolboxFolder: React.FC<{
     <button
       type="button"
       onClick={onToggle}
-      className="w-full px-2.5 py-1.5 flex items-center gap-2 text-left cursor-pointer hover:bg-black/5"
+      className="w-full px-2.5 py-2.5 sm:py-1.5 flex items-center gap-2 text-left cursor-pointer hover:bg-black/5"
     >
       {isExpanded ? (
         <FolderOpen className="w-4 h-4 text-[#FFB300] shrink-0" />
@@ -433,14 +433,14 @@ const ToolboxItem: React.FC<{
   <button
     type="button"
     onClick={onClick}
-    className={`w-full px-2 py-1.5 rounded flex items-center gap-2 text-left cursor-pointer ${
+    className={`w-full px-2.5 py-2.5 sm:px-2 sm:py-1.5 rounded flex items-center gap-2 text-left cursor-pointer ${
       isDark ? 'hover:bg-[#30363D]' : 'hover:bg-[#CCE8FF]'
     }`}
   >
     <span className="shrink-0">{icon}</span>
     <div className="min-w-0">
-      <div className="font-semibold text-[11px]">{name}</div>
-      <div className="text-[10px] opacity-65 truncate">{subtitle}</div>
+      <div className="font-semibold text-xs sm:text-[11px]">{name}</div>
+      <div className="text-[11px] sm:text-[10px] opacity-65 truncate">{subtitle}</div>
     </div>
   </button>
 );

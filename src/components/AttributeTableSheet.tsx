@@ -162,7 +162,10 @@ export const AttributeTableSheet: React.FC = () => {
             <p className="text-xs text-[#0079C1] font-medium">
               {totalCount} {isEs ? 'registros' : 'records'} ({selectedCount}{' '}
               {isEs ? 'seleccionados' : 'selected'}) ·{' '}
-              <span className="opacity-75">
+              <span className="opacity-75 sm:hidden">
+                {isEs ? 'Toca ✎ para editar' : 'Tap ✎ to edit'}
+              </span>
+              <span className="opacity-75 hidden sm:inline">
                 {isEs
                   ? 'Doble clic en celda para editar'
                   : 'Double-click cell to edit'}
@@ -175,7 +178,7 @@ export const AttributeTableSheet: React.FC = () => {
               type="button"
               title={isEs ? 'Añadir Campo' : 'Add Field'}
               onClick={() => setShowAddFieldDialog(true)}
-              className={`px-2 py-1.5 rounded hover:bg-black/10 cursor-pointer flex items-center gap-1 text-xs font-medium ${
+              className={`px-2.5 py-2 sm:px-2 sm:py-1.5 rounded hover:bg-black/10 cursor-pointer flex items-center gap-1 text-xs font-medium ${
                 isDark ? 'text-gray-200 hover:bg-white/10' : 'text-slate-700'
               }`}
             >
@@ -189,7 +192,7 @@ export const AttributeTableSheet: React.FC = () => {
               type="button"
               title={isEs ? 'Calcular Geometría' : 'Calculate Geometry'}
               onClick={() => setShowCalcDialog(true)}
-              className={`px-2 py-1.5 rounded hover:bg-black/10 cursor-pointer flex items-center gap-1 text-xs font-medium ${
+              className={`px-2.5 py-2 sm:px-2 sm:py-1.5 rounded hover:bg-black/10 cursor-pointer flex items-center gap-1 text-xs font-medium ${
                 isDark ? 'text-gray-200 hover:bg-white/10' : 'text-slate-700'
               }`}
             >
@@ -202,7 +205,7 @@ export const AttributeTableSheet: React.FC = () => {
             <button
               type="button"
               onClick={closeAttributeTable}
-              className={`p-1.5 rounded cursor-pointer ${
+              className={`p-2 sm:p-1.5 rounded cursor-pointer ${
                 isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'
               }`}
             >
@@ -235,7 +238,7 @@ export const AttributeTableSheet: React.FC = () => {
           <button
             type="button"
             onClick={() => selectAllInLayer(layer.id)}
-            className="px-3 py-1.5 text-xs font-semibold rounded bg-[#E3F2FD] hover:bg-[#BBDEFB] text-[#0D47A1] border border-[#90CAF9] cursor-pointer"
+            className="px-3.5 py-2 sm:px-3 sm:py-1.5 text-xs font-semibold rounded bg-[#E3F2FD] hover:bg-[#BBDEFB] text-[#0D47A1] border border-[#90CAF9] cursor-pointer"
           >
             {isEs ? 'Todos' : 'Select All'}
           </button>
@@ -243,7 +246,7 @@ export const AttributeTableSheet: React.FC = () => {
           <button
             type="button"
             onClick={() => clearLayerSelection(layer.id)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded border cursor-pointer ${
+            className={`px-3.5 py-2 sm:px-3 sm:py-1.5 text-xs font-semibold rounded border cursor-pointer ${
               isDark
                 ? 'border-[#384252] hover:bg-[#30363D]'
                 : 'border-slate-300 bg-white hover:bg-slate-100'
@@ -258,7 +261,7 @@ export const AttributeTableSheet: React.FC = () => {
                 type="button"
                 title={isEs ? 'Zoom a Selección' : 'Zoom to Selection'}
                 onClick={handleZoomToSelection}
-                className="p-1.5 rounded bg-[#0079C1] hover:bg-[#00639E] text-white cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                className="p-2 sm:p-1.5 rounded bg-[#0079C1] hover:bg-[#00639E] text-white cursor-pointer flex items-center gap-1 text-xs font-semibold"
               >
                 <Crosshair className="w-4 h-4" />
                 <span className="hidden sm:inline">
@@ -270,7 +273,7 @@ export const AttributeTableSheet: React.FC = () => {
                 type="button"
                 title={isEs ? 'Eliminar Seleccionados' : 'Delete Selected'}
                 onClick={() => deleteSelectedFeatures(layer.id)}
-                className="px-2.5 py-1.5 rounded bg-[#D32F2F] hover:bg-[#B71C1C] text-white cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                className="px-3 py-2 sm:px-2.5 sm:py-1.5 rounded bg-[#D32F2F] hover:bg-[#B71C1C] text-white cursor-pointer flex items-center gap-1 text-xs font-semibold"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>
@@ -382,13 +385,17 @@ export const AttributeTableSheet: React.FC = () => {
                               />
                               <button
                                 type="button"
+                                onPointerDown={(e) => {
+                                  e.preventDefault();
+                                  commitCellEdit(feat.id, field.name);
+                                }}
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   commitCellEdit(feat.id, field.name);
                                 }}
-                                className="p-0.5 text-[#2E7D32] cursor-pointer"
+                                className="p-1.5 sm:p-0.5 text-[#2E7D32] cursor-pointer"
                               >
-                                <Check className="w-3.5 h-3.5" />
+                                <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                               </button>
                             </div>
                           ) : (
@@ -411,9 +418,9 @@ export const AttributeTableSheet: React.FC = () => {
                                     val === null || val === undefined ? '' : String(val)
                                   );
                                 }}
-                                className="opacity-65 sm:opacity-0 sm:group-hover:opacity-75 hover:!opacity-100 p-1 -mr-1 cursor-pointer shrink-0"
+                                className="opacity-75 sm:opacity-0 sm:group-hover:opacity-75 hover:!opacity-100 p-2 sm:p-1 -mr-1 cursor-pointer shrink-0"
                               >
-                                <Edit3 className="w-3 h-3" />
+                                <Edit3 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                               </button>
                             </div>
                           )}
@@ -521,7 +528,7 @@ const AddFieldDialog: React.FC<{
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded border border-current/25 cursor-pointer"
+            className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-[13px] sm:text-xs rounded border border-current/25 cursor-pointer"
           >
             {isEs ? 'Cancelar' : 'Cancel'}
           </button>
@@ -529,7 +536,7 @@ const AddFieldDialog: React.FC<{
             type="button"
             disabled={!name.trim()}
             onClick={() => onAdd(name.trim(), type)}
-            className="px-4 py-1.5 rounded bg-[#0079C1] hover:bg-[#00639E] text-white font-bold disabled:opacity-40 cursor-pointer"
+            className="px-5 py-2.5 sm:px-4 sm:py-1.5 text-[13px] sm:text-xs rounded bg-[#0079C1] hover:bg-[#00639E] text-white font-bold disabled:opacity-40 cursor-pointer"
           >
             {isEs ? 'Crear Campo' : 'Add Field'}
           </button>
@@ -620,7 +627,7 @@ const CalculateGeometryDialog: React.FC<{
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded border border-current/25 cursor-pointer"
+            className="px-4 py-2.5 sm:px-3 sm:py-1.5 text-[13px] sm:text-xs rounded border border-current/25 cursor-pointer"
           >
             {isEs ? 'Cancelar' : 'Cancel'}
           </button>
@@ -628,7 +635,7 @@ const CalculateGeometryDialog: React.FC<{
             type="button"
             disabled={!fieldName.trim()}
             onClick={() => onCalculate(fieldName.trim(), property)}
-            className="px-4 py-1.5 rounded bg-[#0079C1] hover:bg-[#00639E] text-white font-bold disabled:opacity-40 cursor-pointer"
+            className="px-5 py-2.5 sm:px-4 sm:py-1.5 text-[13px] sm:text-xs rounded bg-[#0079C1] hover:bg-[#00639E] text-white font-bold disabled:opacity-40 cursor-pointer"
           >
             {isEs ? 'Calcular' : 'Calculate'}
           </button>

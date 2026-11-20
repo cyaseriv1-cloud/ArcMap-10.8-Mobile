@@ -5,6 +5,7 @@ import {
   type Point,
   getGeometryBoundingBox,
   isBBoxEmpty,
+  pointsEqual,
 } from '../core/geometry';
 import {
   type Field,
@@ -132,7 +133,12 @@ function buildShpRecordContent(geom: Geometry | null, shapeType: number): Uint8A
   }
 
   if (shapeType === 1) {
-    const pt = geom.geometryType === GeometryType.POINT ? geom : { x: 0, y: 0 };
+    const pt =
+      geom.geometryType === GeometryType.POINT
+        ? geom
+        : geom.geometryType === GeometryType.MULTI_POINT && geom.points.length > 0
+          ? geom.points[0]
+          : { x: 0, y: 0 };
     const buf = new ArrayBuffer(20);
     const view = new DataView(buf);
     view.setInt32(0, 1, true);
@@ -143,13 +149,22 @@ function buildShpRecordContent(geom: Geometry | null, shapeType: number): Uint8A
 
   if (shapeType === 3 || shapeType === 5) {
     const parts: Point[][] = [];
+    const pushClosedRing = (ring: Point[]) => {
+      if (ring.length === 0) return;
+      const closed =
+        ring.length >= 2 && !pointsEqual(ring[0], ring[ring.length - 1])
+          ? [...ring, ring[0]]
+          : ring;
+      parts.push(closed);
+    };
+
     if (geom.geometryType === GeometryType.POLYLINE) parts.push(geom.points);
     else if (geom.geometryType === GeometryType.MULTI_POLYLINE) {
       geom.polylines.forEach((l) => parts.push(l.points));
     } else if (geom.geometryType === GeometryType.POLYGON) {
-      geom.rings.forEach((r) => parts.push(r));
+      geom.rings.forEach(pushClosedRing);
     } else if (geom.geometryType === GeometryType.MULTI_POLYGON) {
-      geom.polygons.forEach((poly) => poly.rings.forEach((r) => parts.push(r)));
+      geom.polygons.forEach((poly) => poly.rings.forEach(pushClosedRing));
     }
 
     const numParts = parts.length;
@@ -260,7 +275,11 @@ function buildDbf(layer: VectorLayer): Uint8Array {
 
   let offset = 32;
   for (const f of fields) {
-    const cleanName = f.name.slice(0, 10);
+    const cleanName = f.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\x20-\x7e]/g, '_')
+      .slice(0, 10);
     for (let i = 0; i < cleanName.length; i++) {
       out[offset + i] = cleanName.charCodeAt(i) & 0x7f;
     }
@@ -302,10 +321,11 @@ function buildDbf(layer: VectorLayer): Uint8Array {
       let formatted = '';
 
       if (f.type === FieldType.INTEGER) {
-        formatted = (value !== null && value !== undefined ? String(value) : '').padStart(
-          fieldLen,
-          ' '
-        );
+        const d = featureGetDouble(feature, f.name);
+        formatted =
+          d !== null && Number.isFinite(d)
+            ? String(Math.trunc(d)).padStart(fieldLen, ' ')
+            : ' '.repeat(fieldLen);
       } else if (f.type === FieldType.DOUBLE) {
         const d = featureGetDouble(feature, f.name);
         formatted = d !== null ? d.toFixed(6).padStart(fieldLen, ' ') : ' '.repeat(fieldLen);

@@ -88,7 +88,7 @@ export const NewLayerDialog: React.FC = () => {
           <button
             type="button"
             onClick={closeNewLayerDialog}
-            className="p-0.5 hover:bg-white/20 rounded cursor-pointer"
+            className="p-2 sm:p-0.5 hover:bg-white/20 rounded cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -140,7 +140,7 @@ export const NewLayerDialog: React.FC = () => {
                   key={opt.type}
                   type="button"
                   onClick={() => setGeomType(opt.type)}
-                  className={`py-1.5 px-2 rounded border text-xs font-semibold cursor-pointer ${
+                  className={`py-2.5 sm:py-1.5 px-2 rounded border text-[13px] sm:text-xs font-semibold cursor-pointer ${
                     geomType === opt.type
                       ? 'bg-[#0079C1] text-white border-[#0079C1]'
                       : isDark
@@ -162,9 +162,9 @@ export const NewLayerDialog: React.FC = () => {
               <button
                 type="button"
                 onClick={handleAddFieldRow}
-                className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#0079C1]/15 text-[#0079C1] hover:bg-[#0079C1]/25 font-semibold cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 sm:px-2 sm:py-0.5 rounded bg-[#0079C1]/15 text-[#0079C1] hover:bg-[#0079C1]/25 font-semibold cursor-pointer"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                 <span>{isEs ? 'Añadir Campo' : 'Add Field'}</span>
               </button>
             </div>
@@ -237,7 +237,7 @@ export const NewLayerDialog: React.FC = () => {
           <button
             type="button"
             onClick={closeNewLayerDialog}
-            className={`px-3 py-1.5 text-xs rounded border cursor-pointer ${
+            className={`px-4 py-2.5 sm:px-3 sm:py-1.5 text-[13px] sm:text-xs rounded border cursor-pointer ${
               isDark
                 ? 'border-[#384252] text-gray-300 hover:bg-[#282E3A]'
                 : 'border-gray-300 text-gray-700 hover:bg-gray-100'
@@ -248,7 +248,7 @@ export const NewLayerDialog: React.FC = () => {
           <button
             type="submit"
             disabled={!layerName.trim()}
-            className="px-4 py-1.5 text-xs rounded bg-[#0079C1] hover:bg-[#00639E] text-white font-bold disabled:opacity-40 cursor-pointer"
+            className="px-5 py-2.5 sm:px-4 sm:py-1.5 text-[13px] sm:text-xs rounded bg-[#0079C1] hover:bg-[#00639E] text-white font-bold disabled:opacity-40 cursor-pointer"
           >
             {isEs ? 'Crear Capa' : 'Create Layer'}
           </button>

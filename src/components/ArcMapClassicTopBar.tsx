@@ -89,21 +89,21 @@ export const ArcMapClassicTopBar: React.FC = () => {
     };
   }, []);
 
-  const menuDefs: { key: Exclude<MenuKey, null>; label: string }[] = isEs
+  const menuDefs: { key: Exclude<MenuKey, null>; label: string; mobileLabel?: string }[] = isEs
     ? [
         { key: 'file', label: 'Archivo' },
         { key: 'edit', label: 'Edición' },
         { key: 'view', label: 'Ver' },
-        { key: 'selection', label: 'Selección' },
-        { key: 'geoprocessing', label: 'Geoprocesam.' },
+        { key: 'selection', label: 'Selección', mobileLabel: 'Selec.' },
+        { key: 'geoprocessing', label: 'Geoprocesam.', mobileLabel: 'Geoproc.' },
         { key: 'windows', label: 'Ventanas' },
       ]
     : [
         { key: 'file', label: 'File' },
         { key: 'edit', label: 'Edit' },
         { key: 'view', label: 'View' },
-        { key: 'selection', label: 'Selection' },
-        { key: 'geoprocessing', label: 'Geoprocessing' },
+        { key: 'selection', label: 'Selection', mobileLabel: 'Select' },
+        { key: 'geoprocessing', label: 'Geoprocessing', mobileLabel: 'Geoproc.' },
         { key: 'windows', label: 'Windows' },
       ];
 
@@ -165,7 +165,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
       </div>
 
       {/* 2. Classic Menu Bar */}
-      <div className={`w-full ${menuBarBg} border-b ${borderColor} px-1.5 py-1 sm:px-1 sm:py-0.5 flex items-center flex-wrap gap-1 sm:gap-0.5`}>
+      <div className={`w-full ${menuBarBg} border-b ${borderColor} px-1 py-1 sm:px-1 sm:py-0.5 flex items-center justify-between sm:justify-start gap-0.5`}>
         {menuDefs.map((m) => {
           const alignRightOnMobile =
             m.key === 'selection' || m.key === 'geoprocessing' || m.key === 'windows';
@@ -174,7 +174,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveMenu((prev) => (prev === m.key ? null : m.key))}
-              className={`px-2.5 py-1.5 sm:px-2 sm:py-0.5 text-[13px] sm:text-xs rounded-[3px] cursor-pointer whitespace-nowrap ${textColor} ${
+              className={`px-1.5 py-1.5 sm:px-2 sm:py-0.5 text-xs rounded-[3px] cursor-pointer whitespace-nowrap ${textColor} ${
                 activeMenu === m.key
                   ? isDark
                     ? 'bg-[#30363D] font-bold'
@@ -184,7 +184,14 @@ export const ArcMapClassicTopBar: React.FC = () => {
                     : 'hover:bg-[#E0DFDA]'
               }`}
             >
-              {m.label}
+              {m.mobileLabel ? (
+                <>
+                  <span className="sm:hidden">{m.mobileLabel}</span>
+                  <span className="hidden sm:inline">{m.label}</span>
+                </>
+              ) : (
+                m.label
+              )}
             </button>
 
             {activeMenu === m.key && (
