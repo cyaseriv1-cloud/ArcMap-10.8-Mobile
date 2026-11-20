@@ -208,26 +208,31 @@ fun ArcMapTableOfContentsDrawer(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Data...", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
+                        Text("Add Data", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                     }
                 }
 
-                OutlinedButton(
-                    onClick = {
-                        val newLayer = VectorLayer(
-                            name = "Nueva Capa ${layers.size + 1}",
-                            geometryType = GeometryType.POLYGON
-                        )
-                        viewModel.addLayer(newLayer)
-                    },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                Surface(
+                    color = Color(0xFFE3F2FD),
+                    shape = RoundedCornerShape(3.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0079C1)),
                     modifier = Modifier
                         .weight(1f)
                         .height(32.dp)
+                        .clickable {
+                            onClose()
+                            viewModel.openBasemapDialog()
+                        }
                 ) {
-                    Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Nueva Capa", fontSize = 11.sp)
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Layers, contentDescription = null, tint = Color(0xFF0079C1), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Mapa Base", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF0079C1))
+                    }
                 }
             }
         }

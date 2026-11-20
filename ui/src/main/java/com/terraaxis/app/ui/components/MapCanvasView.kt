@@ -9,7 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import com.terraaxis.app.viewmodel.MainViewModel
+import com.terraaxis.map.basemap.TileManager
 import com.terraaxis.map.interaction.MapToolMode
 import com.terraaxis.map.render.MapCanvasRenderer
 
@@ -18,7 +20,17 @@ fun MapCanvasView(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val renderer = remember { MapCanvasRenderer() }
+    val currentBasemap by viewModel.currentBasemap.collectAsState()
+    val tileManager = remember {
+        TileManager(context.cacheDir.resolve("arcmap_tiles")).apply {
+            onTileLoaded = {
+                viewModel.updateRender()
+            }
+        }
+    }
+
     val layers by viewModel.layers.collectAsState()
     val activeTool by viewModel.activeTool.collectAsState()
     val measureSession by viewModel.measureSession.collectAsState()
@@ -73,7 +85,9 @@ fun MapCanvasView(
                 digitizeSession = if (activeTool == MapToolMode.DIGITIZE_LINE || activeTool == MapToolMode.DIGITIZE_POLYGON) digitizeSession else null,
                 isDarkMode = theme == com.terraaxis.app.viewmodel.ArcMapTheme.DARK,
                 gpsLocation = gpsLocation,
-                gpsAccuracy = gpsAccuracy
+                gpsAccuracy = gpsAccuracy,
+                basemap = currentBasemap,
+                tileManager = tileManager
             )
         }
     }

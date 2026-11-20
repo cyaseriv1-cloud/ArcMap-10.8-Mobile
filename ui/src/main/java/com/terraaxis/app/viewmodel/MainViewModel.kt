@@ -1,6 +1,7 @@
 package com.terraaxis.app.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.terraaxis.app.sample.SampleData
 import com.terraaxis.core.crs.ProjectionEngine
 import com.terraaxis.core.crs.UtmCoordinate
@@ -14,6 +15,7 @@ import com.terraaxis.core.model.GeometryProperty
 import com.terraaxis.core.model.VectorLayer
 import com.terraaxis.core.spatial.SpatialIndex
 import com.terraaxis.data.project.MapProject
+import com.terraaxis.map.basemap.BasemapType
 import com.terraaxis.map.interaction.DigitizeSession
 import com.terraaxis.map.interaction.MapToolMode
 import com.terraaxis.map.interaction.MeasureSession
@@ -22,10 +24,17 @@ import com.terraaxis.tools.analysis.BufferTool
 import com.terraaxis.tools.analysis.ClipTool
 import com.terraaxis.tools.generalization.SimplifyLineTool
 import com.terraaxis.tools.query.AttributeQuery
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
 
 enum class ArcMapViewMode {
     DATA_VIEW,
@@ -42,6 +51,14 @@ enum class AppLanguage {
     EN
 }
 
+data class WorldPlaceResult(
+    val displayName: String,
+    val lat: Double,
+    val lon: Double,
+    val type: String,
+    val category: String
+)
+
 class MainViewModel : ViewModel() {
 
     private val _theme = MutableStateFlow(ArcMapTheme.LIGHT)
@@ -49,6 +66,18 @@ class MainViewModel : ViewModel() {
 
     private val _language = MutableStateFlow(AppLanguage.ES)
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
+
+    private val _currentBasemap = MutableStateFlow(BasemapType.OPEN_STREET_MAP)
+    val currentBasemap: StateFlow<BasemapType> = _currentBasemap.asStateFlow()
+
+    private val _isBasemapDialogVisible = MutableStateFlow(false)
+    val isBasemapDialogVisible: StateFlow<Boolean> = _isBasemapDialogVisible.asStateFlow()
+
+    private val _worldSearchResults = MutableStateFlow<List<WorldPlaceResult>>(emptyList())
+    val worldSearchResults: StateFlow<List<WorldPlaceResult>> = _worldSearchResults.asStateFlow()
+
+    private val _isSearchingWorld = MutableStateFlow(false)
+    val isSearchingWorld: StateFlow<Boolean> = _isSearchingWorld.asStateFlow()
 
     private val _gpsLocation = MutableStateFlow<Point?>(null)
     val gpsLocation: StateFlow<Point?> = _gpsLocation.asStateFlow()
@@ -615,5 +644,82 @@ class MainViewModel : ViewModel() {
 
     fun updateRender() {
         mapRenderTrigger.value = System.currentTimeMillis()
+    }
+
+    // ── Funciones de Mapa Base (Basemaps) ──────────────────────────────────────
+    fun setBasemap(type: BasemapType) {
+        _currentBasemap.value = type
+        _statusMessage.value = if (_language.value == AppLanguage.ES) "Mapa base activo: ${type.titleEs}" else "Active basemap: ${type.titleEn}"
+        updateRender()
+    }
+
+    fun openBasemapDialog() {
+        _isBasemapDialogVisible.value = true
+    }
+
+    fun closeBasemapDialog() {
+        _isBasemapDialogVisible.value = false
+    }
+
+    // ── Geocodificador y Navegación Mundial ───────────────────────────────────
+    fun zoomToLocation(lat: Double, lon: Double, zoomLevel: Double = 14.5) {
+        viewport.centerLat = lat
+        viewport.centerLon = lon
+        viewport.zoom = zoomLevel
+        updateCoordinates(lon, lat)
+        updateRender()
+        _statusMessage.value = if (_language.value == AppLanguage.ES) "Navegando a: %.4f, %.4f".format(lat, lon) else "Navigated to: %.4f, %.4f".format(lat, lon)
+    }
+
+    fun searchWorldPlaces(query: String) {
+        val q = query.trim()
+        if (q.length < 2) {
+            _worldSearchResults.value = emptyList()
+            return
+        }
+        viewModelScope.launch {
+            _isSearchingWorld.value = true
+            try {
+                val encoded = withContext(Dispatchers.IO) {
+                    URLEncoder.encode(q, "UTF-8")
+                }
+                val urlStr = "https://nominatim.openstreetmap.org/search?format=json&q=$encoded&limit=8&addressdetails=1"
+                val list = withContext(Dispatchers.IO) {
+                    val url = URL(urlStr)
+                    val conn = (url.openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 6000
+                        readTimeout = 7000
+                        setRequestProperty("User-Agent", "ArcMapMobile/10.8 (com.terraaxis.app; Android GIS)")
+                        setRequestProperty("Accept-Language", if (_language.value == AppLanguage.ES) "es,en" else "en")
+                    }
+                    if (conn.responseCode in 200..299) {
+                        val jsonStr = conn.inputStream.use { it.bufferedReader().readText() }
+                        val arr = JSONArray(jsonStr)
+                        val results = mutableListOf<WorldPlaceResult>()
+                        for (i in 0 until arr.length()) {
+                            val obj = arr.getJSONObject(i)
+                            val name = obj.optString("display_name", "")
+                            val lat = obj.optDouble("lat", 0.0)
+                            val lon = obj.optDouble("lon", 0.0)
+                            val type = obj.optString("type", "")
+                            val cat = obj.optString("class", "")
+                            results.add(WorldPlaceResult(name, lat, lon, type, cat))
+                        }
+                        results
+                    } else {
+                        emptyList()
+                    }
+                }
+                _worldSearchResults.value = list
+            } catch (_: Exception) {
+                _worldSearchResults.value = emptyList()
+            } finally {
+                _isSearchingWorld.value = false
+            }
+        }
+    }
+
+    fun clearWorldSearchResults() {
+        _worldSearchResults.value = emptyList()
     }
 }

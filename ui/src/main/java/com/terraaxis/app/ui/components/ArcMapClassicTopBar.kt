@@ -173,6 +173,14 @@ fun ArcMapClassicTopBar(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    text = { Text(if (isEs) "Añadir mapa base... (Satélite/OSM)" else "Add Basemap... (Satellite/OSM)") },
+                                    leadingIcon = { Icon(Icons.Default.Layers, contentDescription = null, tint = Color(0xFF0079C1)) },
+                                    onClick = {
+                                        activeMenu = null
+                                        viewModel.openBasemapDialog()
+                                    }
+                                )
+                                DropdownMenuItem(
                                     text = { Text(if (isEs) "Cargar Muestra Esri (Cusco)" else "Load Esri Sample Data") },
                                     leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
                                     onClick = {
@@ -355,6 +363,35 @@ fun ArcMapClassicTopBar(
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp,
                         color = Color.Black
+                    )
+                }
+            }
+
+            // BOTÓN CLÁSICO MAPA BASE (ADD BASEMAP)
+            Surface(
+                color = if (isDark) Color(0xFF1E3A5F) else Color(0xFFE3F2FD),
+                shape = RoundedCornerShape(3.dp),
+                shadowElevation = 1.dp,
+                modifier = Modifier
+                    .clickable { viewModel.openBasemapDialog() }
+                    .padding(2.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Layers,
+                        contentDescription = "Añadir Mapa Base",
+                        tint = Color(0xFF0079C1),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        if (isEs) "Mapa Base" else "Basemap",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = if (isDark) Color.White else Color(0xFF0D47A1)
                     )
                 }
             }

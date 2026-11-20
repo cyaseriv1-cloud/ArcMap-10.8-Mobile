@@ -48,6 +48,7 @@ fun ArcMapScreen(
     val isToolboxVisible by viewModel.isToolboxVisible.collectAsState()
     val isCatalogVisible by viewModel.isCatalogVisible.collectAsState()
     val isSearchVisible by viewModel.isSearchVisible.collectAsState()
+    val isBasemapDialogVisible by viewModel.isBasemapDialogVisible.collectAsState()
     val tableLayer by viewModel.selectedLayerForTable.collectAsState()
     val identified by viewModel.identifiedFeature.collectAsState()
     val activeTool by viewModel.activeTool.collectAsState()
@@ -169,6 +170,13 @@ fun ArcMapScreen(
     }
 
     // ── Ventanas modales y diálogos ───────────────────────────────────────────
+    if (isBasemapDialogVisible) {
+        ArcMapBasemapDialog(
+            viewModel = viewModel,
+            onDismiss = { viewModel.closeBasemapDialog() }
+        )
+    }
+
     if (isSearchVisible) {
         ArcMapSearchDialog(
             viewModel = viewModel,

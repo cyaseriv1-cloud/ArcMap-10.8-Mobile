@@ -18,6 +18,9 @@ import com.terraaxis.core.model.Feature
 import com.terraaxis.core.model.VectorLayer
 import com.terraaxis.core.symbology.ColorRgba
 import com.terraaxis.core.symbology.LayerSymbology
+import com.terraaxis.core.crs.ProjectionEngine
+import com.terraaxis.map.basemap.BasemapType
+import com.terraaxis.map.basemap.TileManager
 import com.terraaxis.map.interaction.DigitizeSession
 import com.terraaxis.map.interaction.MeasureSession
 import com.terraaxis.map.viewport.MapViewport
@@ -137,6 +140,19 @@ class MapCanvasRenderer {
         color = Color.rgb(0, 121, 193) // ESRI Blue
     }
 
+    private val tileBitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+    private val attributionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 18f
+        color = Color.rgb(60, 60, 60)
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    private val attributionBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.argb(175, 255, 255, 255)
+    }
+
     private val path = Path()
 
     fun render(
@@ -147,7 +163,9 @@ class MapCanvasRenderer {
         digitizeSession: DigitizeSession? = null,
         isDarkMode: Boolean = false,
         gpsLocation: Point? = null,
-        gpsAccuracy: Float? = null
+        gpsAccuracy: Float? = null,
+        basemap: BasemapType = BasemapType.NONE,
+        tileManager: TileManager? = null
     ) {
         // Adapt theme colors
         if (isDarkMode) {
@@ -160,6 +178,8 @@ class MapCanvasRenderer {
             scaleBarTextPaint.color = Color.rgb(230, 230, 230)
             textHaloPaint.color = Color.rgb(22, 26, 33)
             textPaint.color = Color.rgb(240, 240, 240)
+            attributionBgPaint.color = Color.argb(190, 22, 26, 33)
+            attributionPaint.color = Color.rgb(200, 210, 225)
         } else {
             canvas.drawColor(Color.rgb(246, 247, 248)) // Light paper
             gridPaint.color = Color.argb(45, 0, 0, 0)
@@ -170,6 +190,18 @@ class MapCanvasRenderer {
             scaleBarTextPaint.color = Color.BLACK
             textHaloPaint.color = Color.WHITE
             textPaint.color = Color.rgb(20, 20, 20)
+            attributionBgPaint.color = Color.argb(180, 255, 255, 255)
+            attributionPaint.color = Color.rgb(50, 50, 50)
+        }
+
+        // 1. Renderizar Mapa Base (OpenStreetMap, Esri Satélite, CartoDB, etc.)
+        if (basemap != BasemapType.NONE && tileManager != null) {
+            drawBasemap(canvas, viewport, basemap, tileManager)
+            // Hacer la cuadrícula más sutil sobre imágenes satelitales
+            if (basemap == BasemapType.ESRI_IMAGERY) {
+                gridPaint.color = Color.argb(30, 255, 255, 255)
+                gridTextPaint.color = Color.rgb(220, 220, 220)
+            }
         }
 
         // 2. Draw Cartographic Coordinate Grid (Graticule)
@@ -194,6 +226,70 @@ class MapCanvasRenderer {
         // 7. Draw Cartographic Scale Bar & North Arrow
         drawScaleBar(canvas, viewport)
         drawNorthArrow(canvas, viewport)
+    }
+
+    private fun drawBasemap(
+        canvas: Canvas,
+        viewport: MapViewport,
+        basemap: BasemapType,
+        tileManager: TileManager
+    ) {
+        if (basemap == BasemapType.NONE || basemap.tileUrlTemplate.isBlank()) return
+
+        val currentZoom = viewport.zoom
+        val z = floor(currentZoom).toInt().coerceIn(basemap.minZoom, basemap.maxZoom)
+        val nTiles = 1 shl z
+        val worldSizeMeters = 40075016.686
+        val halfWorld = 20037508.34
+        val tileMeters = worldSizeMeters / nTiles
+
+        val screenW = viewport.screenWidth
+        val screenH = viewport.screenHeight
+        val mpp = viewport.metersPerPixel
+        if (mpp <= 0.0) return
+
+        val mercCenter = ProjectionEngine.wgs84ToWebMercator(viewport.centerLat, viewport.centerLon)
+
+        // Bounding box en Web Mercator del área visible en pantalla
+        val minMercX = mercCenter.x + (0f - screenW / 2f) * mpp
+        val maxMercX = mercCenter.x + (screenW - screenW / 2f) * mpp
+        val maxMercY = mercCenter.y - (0f - screenH / 2f) * mpp
+        val minMercY = mercCenter.y - (screenH - screenH / 2f) * mpp
+
+        val minTileX = floor((minMercX + halfWorld) / tileMeters).toInt().coerceIn(0, nTiles - 1)
+        val maxTileX = floor((maxMercX + halfWorld) / tileMeters).toInt().coerceIn(0, nTiles - 1)
+        val minTileY = floor((halfWorld - maxMercY) / tileMeters).toInt().coerceIn(0, nTiles - 1)
+        val maxTileY = floor((halfWorld - minMercY) / tileMeters).toInt().coerceIn(0, nTiles - 1)
+
+        for (tx in minTileX..maxTileX) {
+            for (ty in minTileY..maxTileY) {
+                val tileLeftMercX = -halfWorld + tx * tileMeters
+                val tileRightMercX = -halfWorld + (tx + 1) * tileMeters
+                val tileTopMercY = halfWorld - ty * tileMeters
+                val tileBottomMercY = halfWorld - (ty + 1) * tileMeters
+
+                val left = (screenW / 2f + (tileLeftMercX - mercCenter.x) / mpp).toFloat()
+                val right = (screenW / 2f + (tileRightMercX - mercCenter.x) / mpp).toFloat()
+                val top = (screenH / 2f + (mercCenter.y - tileTopMercY) / mpp).toFloat()
+                val bottom = (screenH / 2f + (mercCenter.y - tileBottomMercY) / mpp).toFloat()
+
+                val destRect = RectF(left, top, right, bottom)
+                val bmp = tileManager.getTile(basemap, z, tx, ty)
+                if (bmp != null) {
+                    canvas.drawBitmap(bmp, null, destRect, tileBitmapPaint)
+                }
+            }
+        }
+
+        // Atribución de fuente de datos cartográfica
+        if (basemap.attribution.isNotBlank()) {
+            val attrText = basemap.attribution
+            val textWidth = attributionPaint.measureText(attrText)
+            val rectLeft = screenW - textWidth - 20f
+            val rectTop = screenH - 24f
+            canvas.drawRect(rectLeft - 6f, rectTop - 18f, screenW - 6f, rectTop + 6f, attributionBgPaint)
+            canvas.drawText(attrText, rectLeft, rectTop, attributionPaint)
+        }
     }
 
     private fun drawGpsLocation(canvas: Canvas, viewport: MapViewport, loc: Point, accuracy: Float?) {
