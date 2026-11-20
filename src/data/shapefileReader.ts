@@ -3,6 +3,7 @@ import {
   GeometryType,
   type Point,
   type Polyline,
+  makeMultiPoint,
   makeMultiPolyline,
   makePoint,
   makePolygon,
@@ -72,10 +73,15 @@ function readShp(buffer: ArrayBuffer): {
 
   const shapeTypeInt = view.getInt32(32, true); // Little-endian
   let dominantType = GeometryType.UNKNOWN;
-  if (shapeTypeInt === 1) dominantType = GeometryType.POINT;
-  else if (shapeTypeInt === 3) dominantType = GeometryType.POLYLINE;
-  else if (shapeTypeInt === 5) dominantType = GeometryType.POLYGON;
-  else if (shapeTypeInt === 8) dominantType = GeometryType.MULTI_POINT;
+  if (shapeTypeInt === 1 || shapeTypeInt === 11 || shapeTypeInt === 21) {
+    dominantType = GeometryType.POINT;
+  } else if (shapeTypeInt === 3 || shapeTypeInt === 13 || shapeTypeInt === 23) {
+    dominantType = GeometryType.POLYLINE;
+  } else if (shapeTypeInt === 5 || shapeTypeInt === 15 || shapeTypeInt === 25) {
+    dominantType = GeometryType.POLYGON;
+  } else if (shapeTypeInt === 8 || shapeTypeInt === 18 || shapeTypeInt === 28) {
+    dominantType = GeometryType.MULTI_POINT;
+  }
 
   const geometries: (Geometry | null)[] = [];
   let offset = 100;
@@ -85,58 +91,91 @@ function readShp(buffer: ArrayBuffer): {
     const contentLengthBytes = contentLengthWords * 2;
     offset += 8;
 
-    if (offset + contentLengthBytes > buffer.byteLength) break;
+    if (contentLengthBytes < 4 || offset + contentLengthBytes > buffer.byteLength) break;
 
+    const recordEnd = offset + contentLengthBytes;
     let pos = offset;
     const recordShapeType = view.getInt32(pos, true);
     pos += 4;
 
     let geom: Geometry | null = null;
-    if (recordShapeType === 1) {
-      const x = view.getFloat64(pos, true);
-      const y = view.getFloat64(pos + 8, true);
-      geom = makePoint(x, y);
-    } else if (recordShapeType === 3 || recordShapeType === 5) {
-      // Skip bounding box (4 doubles = 32 bytes)
-      pos += 32;
-      const numParts = view.getInt32(pos, true);
-      const numPoints = view.getInt32(pos + 4, true);
-      pos += 8;
-
-      const partIndices: number[] = [];
-      for (let p = 0; p < numParts; p++) {
-        partIndices.push(view.getInt32(pos, true));
-        pos += 4;
-      }
-
-      const allPoints: Point[] = [];
-      for (let pt = 0; pt < numPoints; pt++) {
+    if (recordShapeType === 0) {
+      geom = null;
+    } else if (recordShapeType === 1 || recordShapeType === 11 || recordShapeType === 21) {
+      if (pos + 16 <= recordEnd) {
         const x = view.getFloat64(pos, true);
         const y = view.getFloat64(pos + 8, true);
-        pos += 16;
-        allPoints.push(makePoint(x, y));
+        geom = makePoint(x, y);
       }
+    } else if (recordShapeType === 8 || recordShapeType === 18 || recordShapeType === 28) {
+      // MultiPoint / MultiPointZ / MultiPointM: 32-byte bbox + int32 numPoints
+      if (pos + 36 <= recordEnd) {
+        pos += 32;
+        const numPoints = Math.max(0, view.getInt32(pos, true));
+        pos += 4;
+        const pts: Point[] = [];
+        for (let pt = 0; pt < numPoints && pos + 16 <= recordEnd; pt++) {
+          const x = view.getFloat64(pos, true);
+          const y = view.getFloat64(pos + 8, true);
+          pos += 16;
+          pts.push(makePoint(x, y));
+        }
+        geom = pts.length > 0 ? makeMultiPoint(pts) : null;
+      }
+    } else if (
+      recordShapeType === 3 ||
+      recordShapeType === 13 ||
+      recordShapeType === 23 ||
+      recordShapeType === 5 ||
+      recordShapeType === 15 ||
+      recordShapeType === 25
+    ) {
+      if (pos + 40 <= recordEnd) {
+        // Skip bounding box (4 doubles = 32 bytes)
+        pos += 32;
+        const numParts = Math.max(0, view.getInt32(pos, true));
+        const numPoints = Math.max(0, view.getInt32(pos + 4, true));
+        pos += 8;
 
-      if (recordShapeType === 3) {
-        const lines: Polyline[] = [];
-        for (let p = 0; p < numParts; p++) {
-          const start = partIndices[p];
-          const end = p + 1 < numParts ? partIndices[p + 1] : numPoints;
-          if (start < end && end <= allPoints.length) {
-            lines.push(makePolyline(allPoints.slice(start, end)));
-          }
+        const partIndices: number[] = [];
+        for (let p = 0; p < numParts && pos + 4 <= recordEnd; p++) {
+          partIndices.push(view.getInt32(pos, true));
+          pos += 4;
         }
-        geom = lines.length === 1 ? lines[0] : makeMultiPolyline(lines);
-      } else {
-        const rings: Point[][] = [];
-        for (let p = 0; p < numParts; p++) {
-          const start = partIndices[p];
-          const end = p + 1 < numParts ? partIndices[p + 1] : numPoints;
-          if (start < end && end <= allPoints.length) {
-            rings.push(allPoints.slice(start, end));
-          }
+
+        const allPoints: Point[] = [];
+        for (let pt = 0; pt < numPoints && pos + 16 <= recordEnd; pt++) {
+          const x = view.getFloat64(pos, true);
+          const y = view.getFloat64(pos + 8, true);
+          pos += 16;
+          allPoints.push(makePoint(x, y));
         }
-        geom = makePolygon(rings);
+
+        const isPolyline =
+          recordShapeType === 3 || recordShapeType === 13 || recordShapeType === 23;
+
+        if (isPolyline) {
+          const lines: Polyline[] = [];
+          for (let p = 0; p < partIndices.length; p++) {
+            const start = partIndices[p];
+            const end = p + 1 < partIndices.length ? partIndices[p + 1] : allPoints.length;
+            if (start >= 0 && start < end && end <= allPoints.length) {
+              lines.push(makePolyline(allPoints.slice(start, end)));
+            }
+          }
+          geom =
+            lines.length === 0 ? null : lines.length === 1 ? lines[0] : makeMultiPolyline(lines);
+        } else {
+          const rings: Point[][] = [];
+          for (let p = 0; p < partIndices.length; p++) {
+            const start = partIndices[p];
+            const end = p + 1 < partIndices.length ? partIndices[p + 1] : allPoints.length;
+            if (start >= 0 && start < end && end <= allPoints.length) {
+              rings.push(allPoints.slice(start, end));
+            }
+          }
+          geom = rings.length > 0 ? makePolygon(rings) : null;
+        }
       }
     }
 

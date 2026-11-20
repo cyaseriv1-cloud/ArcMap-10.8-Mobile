@@ -149,6 +149,7 @@ interface ArcMapContextValue {
   statusMessage: string;
   renderVersion: number;
 
+  setStatusMessage: (msg: string) => void;
   updateRender: () => void;
   loadSampleData: () => void;
   setTool: (tool: MapToolMode) => void;
@@ -1427,8 +1428,11 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const runSelectByAttributes = useCallback(
     (layer: VectorLayer, whereClause: string) => {
-      const count = AttributeQuery.selectByAttributes(layer, whereClause);
-      setStatusMessage(`${count} entidades seleccionadas con: ${whereClause}`);
+      const nextSel = AttributeQuery.computeSelection(layer, whereClause);
+      setLayers((prev) =>
+        prev.map((l) => (l.id === layer.id ? { ...l, selectedFeatureIds: nextSel } : l))
+      );
+      setStatusMessage(`${nextSel.size} entidades seleccionadas con: ${whereClause}`);
       updateRender();
     },
     [updateRender]
@@ -1579,6 +1583,7 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     statusMessage,
     renderVersion,
 
+    setStatusMessage,
     updateRender,
     loadSampleData,
     setTool,

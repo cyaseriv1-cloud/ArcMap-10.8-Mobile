@@ -190,10 +190,35 @@ export function calculateLayerGeometry(
             holes += ProjectionEngine.geodesicPolygonAreaSquareMeters(geom.rings[i]);
           }
           value = Math.max(0.0, outer - holes);
+        } else if (geom.geometryType === GeometryType.MULTI_POLYGON) {
+          let sumArea = 0.0;
+          for (const poly of geom.polygons) {
+            if (poly.rings.length === 0) continue;
+            const outer = ProjectionEngine.geodesicPolygonAreaSquareMeters(poly.rings[0]);
+            let holes = 0.0;
+            for (let i = 1; i < poly.rings.length; i++) {
+              holes += ProjectionEngine.geodesicPolygonAreaSquareMeters(poly.rings[i]);
+            }
+            sumArea += Math.max(0.0, outer - holes);
+          }
+          value = sumArea;
         }
         break;
       }
       case GeometryProperty.LENGTH_OR_PERIMETER: {
+        const ringPerimeter = (ring: { x: number; y: number }[]) => {
+          let total = 0.0;
+          for (let i = 0; i < ring.length - 1; i++) {
+            total += ProjectionEngine.geodesicDistanceMeters(ring[i], ring[i + 1]);
+          }
+          if (
+            ring.length > 1 &&
+            (ring[0].x !== ring[ring.length - 1].x || ring[0].y !== ring[ring.length - 1].y)
+          ) {
+            total += ProjectionEngine.geodesicDistanceMeters(ring[ring.length - 1], ring[0]);
+          }
+          return total;
+        };
         if (geom.geometryType === GeometryType.POLYLINE) {
           let totalMeters = 0.0;
           for (let i = 0; i < geom.points.length - 1; i++) {
@@ -203,23 +228,24 @@ export function calculateLayerGeometry(
             );
           }
           value = totalMeters;
-        } else if (geom.geometryType === GeometryType.POLYGON) {
+        } else if (geom.geometryType === GeometryType.MULTI_POLYLINE) {
           let totalMeters = 0.0;
-          for (const ring of geom.rings) {
-            for (let i = 0; i < ring.length - 1; i++) {
-              totalMeters += ProjectionEngine.geodesicDistanceMeters(ring[i], ring[i + 1]);
-            }
-            if (
-              ring.length > 1 &&
-              (ring[0].x !== ring[ring.length - 1].x || ring[0].y !== ring[ring.length - 1].y)
-            ) {
+          for (const line of geom.polylines) {
+            for (let i = 0; i < line.points.length - 1; i++) {
               totalMeters += ProjectionEngine.geodesicDistanceMeters(
-                ring[ring.length - 1],
-                ring[0]
+                line.points[i],
+                line.points[i + 1]
               );
             }
           }
           value = totalMeters;
+        } else if (geom.geometryType === GeometryType.POLYGON) {
+          value = geom.rings.reduce((acc, ring) => acc + ringPerimeter(ring), 0.0);
+        } else if (geom.geometryType === GeometryType.MULTI_POLYGON) {
+          value = geom.polygons.reduce(
+            (acc, poly) => acc + poly.rings.reduce((rAcc, ring) => rAcc + ringPerimeter(ring), 0.0),
+            0.0
+          );
         }
         break;
       }

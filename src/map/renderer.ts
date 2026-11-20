@@ -60,13 +60,15 @@ export class MapCanvasRenderer {
     ctx.fillStyle = isDarkMode ? 'rgb(22, 26, 33)' : 'rgb(246, 247, 248)';
     ctx.fillRect(0, 0, w, h);
 
+    const isSatellite = basemap?.id === BasemapId.ESRI_IMAGERY;
+
     // 1. Basemap tiles
     if (basemap && basemap.id !== BasemapId.NONE && tileManager) {
       this.drawBasemap(ctx, viewport, basemap, tileManager, isDarkMode);
     }
 
     // 2. Cartographic coordinate grid (graticule)
-    this.drawGraticule(ctx, viewport, isDarkMode, basemap?.id === BasemapId.ESRI_IMAGERY);
+    this.drawGraticule(ctx, viewport, isDarkMode, isSatellite);
 
     // 3. Vector layers (reverse order: index 0 drawn last / on top)
     for (let i = layers.length - 1; i >= 0; i--) {
@@ -91,8 +93,8 @@ export class MapCanvasRenderer {
     }
 
     // 7. Scale bar & North arrow
-    this.drawScaleBar(ctx, viewport, isDarkMode);
-    this.drawNorthArrow(ctx, viewport, isDarkMode);
+    this.drawScaleBar(ctx, viewport, isDarkMode, isSatellite);
+    this.drawNorthArrow(ctx, viewport, isDarkMode, isSatellite);
 
     ctx.restore();
   }
@@ -696,7 +698,8 @@ export class MapCanvasRenderer {
   private drawScaleBar(
     ctx: CanvasRenderingContext2D,
     viewport: MapViewport,
-    isDarkMode: boolean
+    isDarkMode: boolean,
+    isSatellite: boolean
   ): void {
     const groundMpp = viewport.groundMetersPerPixel;
     if (groundMpp <= 0) return;
@@ -711,8 +714,9 @@ export class MapCanvasRenderer {
     const barHeight = 7;
     const halfW = barWidthPx / 2;
 
-    const blackCol = isDarkMode ? 'rgb(230, 230, 230)' : '#000000';
-    const whiteCol = isDarkMode ? 'rgb(40, 48, 60)' : '#FFFFFF';
+    const lightInk = isDarkMode || isSatellite;
+    const blackCol = lightInk ? 'rgb(240, 240, 240)' : '#000000';
+    const whiteCol = lightInk ? 'rgb(30, 36, 46)' : '#FFFFFF';
 
     ctx.save();
     ctx.fillStyle = blackCol;
@@ -734,8 +738,13 @@ export class MapCanvasRenderer {
       niceMeters >= 1000 ? `${Math.round(niceMeters / 1000)} km` : `${Math.round(niceMeters)} m`;
 
     ctx.font = 'bold 11px sans-serif';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = lightInk ? 'rgba(0, 0, 0, 0.78)' : 'rgba(255, 255, 255, 0.85)';
     ctx.fillStyle = blackCol;
+    ctx.strokeText('0', startX - 2, startY - 5);
     ctx.fillText('0', startX - 2, startY - 5);
+    ctx.strokeText(label, startX + barWidthPx - 12, startY - 5);
     ctx.fillText(label, startX + barWidthPx - 12, startY - 5);
     ctx.restore();
   }
@@ -754,14 +763,16 @@ export class MapCanvasRenderer {
   private drawNorthArrow(
     ctx: CanvasRenderingContext2D,
     viewport: MapViewport,
-    isDarkMode: boolean
+    isDarkMode: boolean,
+    isSatellite: boolean
   ): void {
     const cx = viewport.screenWidth - 36;
     const cy = 54;
     const size = 16;
 
-    const blackCol = isDarkMode ? 'rgb(230, 230, 230)' : '#000000';
-    const whiteCol = isDarkMode ? 'rgb(40, 48, 60)' : '#FFFFFF';
+    const lightInk = isDarkMode || isSatellite;
+    const blackCol = lightInk ? 'rgb(240, 240, 240)' : '#000000';
+    const whiteCol = lightInk ? 'rgb(30, 36, 46)' : '#FFFFFF';
 
     ctx.save();
     ctx.beginPath();
@@ -784,7 +795,11 @@ export class MapCanvasRenderer {
     ctx.stroke();
 
     ctx.font = 'bold 12px sans-serif';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = lightInk ? 'rgba(0, 0, 0, 0.78)' : 'rgba(255, 255, 255, 0.85)';
     ctx.fillStyle = blackCol;
+    ctx.strokeText('N', cx - 4.5, cy - size - 4);
     ctx.fillText('N', cx - 4.5, cy - size - 4);
     ctx.restore();
   }

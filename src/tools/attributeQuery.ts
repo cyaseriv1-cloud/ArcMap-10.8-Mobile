@@ -8,41 +8,53 @@ export enum SelectionMode {
 }
 
 export const AttributeQuery = {
-  selectByAttributes(
+  computeSelection(
     layer: VectorLayer,
     whereClause: string,
     selectionMode: SelectionMode = SelectionMode.NEW_SELECTION
-  ): number {
+  ): Set<number> {
     const trimmed = whereClause.trim();
     if (!trimmed) {
-      if (selectionMode === SelectionMode.NEW_SELECTION) {
-        layer.selectedFeatureIds.clear();
-      }
-      return 0;
+      return selectionMode === SelectionMode.NEW_SELECTION
+        ? new Set<number>()
+        : new Set(layer.selectedFeatureIds);
     }
 
     const matchingIds = new Set(
       layer.features.filter((f) => evaluateExpression(f, trimmed)).map((f) => f.id)
     );
 
+    const next =
+      selectionMode === SelectionMode.NEW_SELECTION
+        ? new Set<number>()
+        : new Set(layer.selectedFeatureIds);
+
     switch (selectionMode) {
       case SelectionMode.NEW_SELECTION:
-        layer.selectedFeatureIds.clear();
-        matchingIds.forEach((id) => layer.selectedFeatureIds.add(id));
-        break;
       case SelectionMode.ADD_TO_SELECTION:
-        matchingIds.forEach((id) => layer.selectedFeatureIds.add(id));
+        matchingIds.forEach((id) => next.add(id));
         break;
       case SelectionMode.REMOVE_FROM_SELECTION:
-        matchingIds.forEach((id) => layer.selectedFeatureIds.delete(id));
+        matchingIds.forEach((id) => next.delete(id));
         break;
       case SelectionMode.SELECT_SUBSET:
-        for (const id of Array.from(layer.selectedFeatureIds)) {
-          if (!matchingIds.has(id)) layer.selectedFeatureIds.delete(id);
+        for (const id of Array.from(next)) {
+          if (!matchingIds.has(id)) next.delete(id);
         }
         break;
     }
 
+    return next;
+  },
+
+  selectByAttributes(
+    layer: VectorLayer,
+    whereClause: string,
+    selectionMode: SelectionMode = SelectionMode.NEW_SELECTION
+  ): number {
+    const next = this.computeSelection(layer, whereClause, selectionMode);
+    layer.selectedFeatureIds.clear();
+    next.forEach((id) => layer.selectedFeatureIds.add(id));
     return layer.selectedFeatureIds.size;
   },
 };

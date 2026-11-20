@@ -2,6 +2,9 @@ import {
   type Geometry,
   GeometryType,
   type Point,
+  type Polygon,
+  makeMultiPolygon,
+  makeMultiPolyline,
   makePolygon,
   makePolyline,
   pointDistanceTo,
@@ -38,21 +41,31 @@ export const SimplifyLineTool = {
   },
 };
 
+function simplifyPolygon(poly: Polygon, epsilon: number): Polygon {
+  const newRings = poly.rings.map((ring) => {
+    const simplified = rdp(ring, epsilon);
+    if (simplified.length >= 3) {
+      return !pointsEqual(simplified[0], simplified[simplified.length - 1])
+        ? [...simplified, simplified[0]]
+        : simplified;
+    }
+    return ring;
+  });
+  return makePolygon(newRings);
+}
+
 function simplifyGeometry(geom: Geometry, epsilon: number): Geometry {
   if (geom.geometryType === GeometryType.POLYLINE) {
     return makePolyline(rdp(geom.points, epsilon));
   }
+  if (geom.geometryType === GeometryType.MULTI_POLYLINE) {
+    return makeMultiPolyline(geom.polylines.map((l) => makePolyline(rdp(l.points, epsilon))));
+  }
   if (geom.geometryType === GeometryType.POLYGON) {
-    const newRings = geom.rings.map((ring) => {
-      const simplified = rdp(ring, epsilon);
-      if (simplified.length >= 3) {
-        return !pointsEqual(simplified[0], simplified[simplified.length - 1])
-          ? [...simplified, simplified[0]]
-          : simplified;
-      }
-      return ring;
-    });
-    return makePolygon(newRings);
+    return simplifyPolygon(geom, epsilon);
+  }
+  if (geom.geometryType === GeometryType.MULTI_POLYGON) {
+    return makeMultiPolygon(geom.polygons.map((p) => simplifyPolygon(p, epsilon)));
   }
   return geom;
 }

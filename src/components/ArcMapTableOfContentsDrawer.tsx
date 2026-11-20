@@ -38,6 +38,7 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
     toggleCatalog,
     openBasemapDialog,
     openNewLayerDialog,
+    clearAllSelections,
     theme,
     language,
   } = useArcMap();
@@ -51,6 +52,13 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
   const isEs = language === AppLanguage.ES;
 
   const propertiesLayer = layers.find((l) => l.id === propertiesLayerId) ?? null;
+
+  const displayedLayers =
+    tocTab === 'visibility'
+      ? [...layers.filter((l) => l.isVisible), ...layers.filter((l) => !l.isVisible)]
+      : tocTab === 'selection'
+        ? layers.filter((l) => l.selectedFeatureIds.size > 0)
+        : layers;
 
   return (
     <>
@@ -150,62 +158,94 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
 
         {/* Data Frame: Layers */}
         <div
-          className={`mt-1.5 px-2 py-1 rounded-[2px] flex items-center gap-1.5 ${
+          className={`mt-1.5 px-2 py-1 rounded-[2px] flex items-center justify-between gap-1.5 ${
             isDark ? 'bg-[#21262D]' : 'bg-[#E8EEF5]'
           }`}
         >
-          <Globe className="w-4 h-4 text-[#0079C1]" />
-          <span
-            className={`font-bold text-xs ${
-              isDark ? 'text-[#90CAF9]' : 'text-[#1A237E]'
-            }`}
-          >
-            Layers
-          </span>
-          <span className="text-[11px] opacity-65">
-            ({layers.length} {isEs ? 'capas' : 'layers'})
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Globe className="w-4 h-4 text-[#0079C1] shrink-0" />
+            <span
+              className={`font-bold text-xs truncate ${
+                isDark ? 'text-[#90CAF9]' : 'text-[#1A237E]'
+              }`}
+            >
+              {tocTab === 'source'
+                ? isEs
+                  ? 'Fuente y CRS'
+                  : 'Source & CRS'
+                : tocTab === 'visibility'
+                  ? isEs
+                    ? 'Por Visibilidad'
+                    : 'By Visibility'
+                  : tocTab === 'selection'
+                    ? isEs
+                      ? 'Con Selección'
+                      : 'Selected Layers'
+                    : 'Layers'}
+            </span>
+            <span className="text-[11px] opacity-65 shrink-0">
+              ({displayedLayers.length} {isEs ? 'capas' : 'layers'})
+            </span>
+          </div>
+
+          {tocTab === 'selection' && displayedLayers.length > 0 && (
+            <button
+              type="button"
+              onClick={clearAllSelections}
+              className="text-[10px] font-semibold text-[#0079C1] hover:underline shrink-0 cursor-pointer"
+            >
+              {isEs ? 'Limpiar' : 'Clear'}
+            </button>
+          )}
         </div>
 
         <div className={`my-1 border-t ${isDark ? 'border-[#30363D]' : 'border-[#B0B0B0]'}`} />
 
         {/* Layer Tree */}
         <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 pr-0.5">
-          {layers.length === 0 ? (
+          {displayedLayers.length === 0 ? (
             <div className="text-center py-8 px-3 text-xs opacity-65">
-              {isEs
-                ? 'No hay capas vectoriales cargadas. Usa "Add Data" o carga los datos de muestra.'
-                : 'No vector layers loaded. Use "Add Data" or load sample data.'}
+              {tocTab === 'selection'
+                ? isEs
+                  ? 'Ninguna capa tiene entidades seleccionadas.'
+                  : 'No layers currently have selected features.'
+                : isEs
+                  ? 'No hay capas vectoriales cargadas. Usa "Add Data" o carga los datos de muestra.'
+                  : 'No vector layers loaded. Use "Add Data" or load sample data.'}
             </div>
           ) : (
-            layers.map((layer, index) => (
-              <ArcMapLayerTreeItem
-                key={layer.id}
-                layer={layer}
-                isActive={activeLayer?.id === layer.id}
-                isFirst={index === 0}
-                isLast={index === layers.length - 1}
-                isDark={isDark}
-                isEs={isEs}
-                onSelect={() => setActiveLayer(layer)}
-                onToggleVisibility={() => toggleLayerVisibility(layer.id)}
-                onOpenTable={() => {
-                  openAttributeTable(layer);
-                  if (window.innerWidth < 768) toggleToc(false);
-                }}
-                onOpenProperties={() => setPropertiesLayerId(layer.id)}
-                onZoomToLayer={() => {
-                  const box = getLayerBoundingBox(layer);
-                  if (!isBBoxEmpty(box)) {
-                    zoomToExtentOfLayer(layer);
-                  }
-                }}
-                onMoveUp={() => moveLayerUp(layer.id)}
-                onMoveDown={() => moveLayerDown(layer.id)}
-                onOpacityChange={(val) => setLayerOpacity(layer.id, val)}
-                onDelete={() => removeLayer(layer.id)}
-              />
-            ))
+            displayedLayers.map((layer) => {
+              const origIndex = layers.findIndex((l) => l.id === layer.id);
+              return (
+                <ArcMapLayerTreeItem
+                  key={layer.id}
+                  layer={layer}
+                  tocTab={tocTab}
+                  isActive={activeLayer?.id === layer.id}
+                  isFirst={origIndex <= 0}
+                  isLast={origIndex === layers.length - 1}
+                  isDark={isDark}
+                  isEs={isEs}
+                  onSelect={() => setActiveLayer(layer)}
+                  onToggleVisibility={() => toggleLayerVisibility(layer.id)}
+                  onOpenTable={() => {
+                    openAttributeTable(layer);
+                    if (window.innerWidth < 768) toggleToc(false);
+                  }}
+                  onOpenProperties={() => setPropertiesLayerId(layer.id)}
+                  onZoomToLayer={() => {
+                    const box = getLayerBoundingBox(layer);
+                    if (!isBBoxEmpty(box)) {
+                      zoomToExtentOfLayer(layer);
+                    }
+                  }}
+                  onMoveUp={() => moveLayerUp(layer.id)}
+                  onMoveDown={() => moveLayerDown(layer.id)}
+                  onOpacityChange={(val) => setLayerOpacity(layer.id, val)}
+                  onDelete={() => removeLayer(layer.id)}
+                />
+              );
+            })
           )}
         </div>
 
@@ -266,6 +306,7 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
 
 const ArcMapLayerTreeItem: React.FC<{
   layer: VectorLayer;
+  tocTab: 'order' | 'source' | 'visibility' | 'selection';
   isActive: boolean;
   isFirst: boolean;
   isLast: boolean;
@@ -282,6 +323,7 @@ const ArcMapLayerTreeItem: React.FC<{
   onDelete: () => void;
 }> = ({
   layer,
+  tocTab,
   isActive,
   isFirst,
   isLast,
@@ -308,9 +350,19 @@ const ArcMapLayerTreeItem: React.FC<{
       : 'bg-white border-[#E0E0E0]';
 
   const legendText =
-    layer.symbology.type === 'UniqueValues'
-      ? `${isEs ? 'Valores únicos por:' : 'Unique values:'} ${layer.symbology.fieldName}`
-      : `${isEs ? 'Símbolo simple' : 'Simple symbol'} (${layer.geometryType.toLowerCase()})`;
+    tocTab === 'source'
+      ? `EPSG:${layer.crs.epsgCode} · ${layer.fields.length} ${isEs ? 'campos' : 'fields'}${layer.labelFieldName ? ` · Lbl: ${layer.labelFieldName}` : ''}`
+      : tocTab === 'visibility'
+        ? layer.isVisible
+          ? isEs
+            ? 'Visible en el mapa'
+            : 'Visible on map'
+          : isEs
+            ? 'Oculta en el mapa'
+            : 'Hidden on map'
+        : layer.symbology.type === 'UniqueValues'
+          ? `${isEs ? 'Valores únicos por:' : 'Unique values:'} ${layer.symbology.fieldName}`
+          : `${isEs ? 'Símbolo simple' : 'Simple symbol'} (${layer.geometryType.toLowerCase()})`;
 
   return (
     <div

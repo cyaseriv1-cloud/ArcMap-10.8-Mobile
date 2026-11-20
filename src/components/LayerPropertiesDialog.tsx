@@ -189,7 +189,11 @@ export const LayerPropertiesDialog: React.FC<{
                 <div className="flex items-center gap-2 mb-2.5">
                   <span
                     className="w-6 h-6 rounded-full border border-gray-400 shrink-0"
-                    style={{ backgroundColor: fillHex }}
+                    style={{
+                      backgroundColor: /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(fillHex.trim())
+                        ? fillHex.trim()
+                        : '#808080',
+                    }}
                   />
                   <input
                     type="text"
@@ -301,16 +305,24 @@ export const LayerPropertiesDialog: React.FC<{
                 <label className="text-[10px] opacity-75 block mb-0.5">
                   {isEs ? 'HEX Borde' : 'Stroke HEX'}
                 </label>
-                <input
-                  type="text"
-                  value={strokeHex}
-                  onChange={(e) => setStrokeHex(e.target.value)}
-                  className={`w-full px-2 py-1.5 rounded border font-mono text-xs ${
-                    isDark
-                      ? 'bg-[#282E3A] border-[#384252] text-white'
-                      : 'bg-white border-gray-300 text-black'
-                  }`}
-                />
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={strokeHex}
+                    onChange={(e) => setStrokeHex(e.target.value)}
+                    className={`flex-1 min-w-0 px-2 py-1.5 rounded border font-mono text-xs ${
+                      isDark
+                        ? 'bg-[#282E3A] border-[#384252] text-white'
+                        : 'bg-white border-gray-300 text-black'
+                    }`}
+                  />
+                  <input
+                    type="color"
+                    value={/^#[0-9A-Fa-f]{6}$/.test(strokeHex) ? strokeHex : '#000000'}
+                    onChange={(e) => setStrokeHex(e.target.value.toUpperCase())}
+                    className="w-8 h-7 p-0 border-0 bg-transparent cursor-pointer shrink-0"
+                  />
+                </div>
               </div>
               <div className="w-24">
                 <label className="text-[10px] opacity-75 block mb-0.5">

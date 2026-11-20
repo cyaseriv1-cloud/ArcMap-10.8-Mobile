@@ -2,6 +2,7 @@ import {
   type BoundingBox,
   type Geometry,
   GeometryType,
+  type MultiPolyline,
   type Point,
   type Polygon,
   type Polyline,
@@ -12,7 +13,7 @@ import {
   makeMultiPolygon,
   makeMultiPolyline,
   makePoint,
-  makePolygonFromRing,
+  makePolygon,
   makePolyline,
   pointsEqual,
 } from '../core/geometry';
@@ -49,7 +50,11 @@ export const ClipTool = {
 
     return createVectorLayer({
       name: outputLayerName,
-      geometryType: inputLayer.geometryType,
+      geometryType:
+        inputLayer.geometryType === GeometryType.POLYLINE &&
+        outFeatures.some((f) => f.geometry?.geometryType === GeometryType.MULTI_POLYLINE)
+          ? GeometryType.MULTI_POLYLINE
+          : inputLayer.geometryType,
       symbology: createSimpleSymbology({
         fillColor: makeColor(76, 175, 80, 0.5),
         strokeColor: makeColor(46, 125, 50),
@@ -76,9 +81,13 @@ function clipGeometry(geom: Geometry, box: BoundingBox): Geometry | null {
       return inside.length > 0 ? makeMultiPoint(inside) : null;
     }
     case GeometryType.MULTI_POLYLINE: {
-      const lines = geom.polylines
-        .map((l) => clipPolyline(l, box))
-        .filter((l): l is Polyline => l !== null);
+      const lines: Polyline[] = [];
+      for (const l of geom.polylines) {
+        const clipped = clipPolyline(l, box);
+        if (!clipped) continue;
+        if (clipped.geometryType === GeometryType.POLYLINE) lines.push(clipped);
+        else lines.push(...clipped.polylines);
+      }
       return lines.length > 0 ? makeMultiPolyline(lines) : null;
     }
     case GeometryType.MULTI_POLYGON: {
@@ -101,11 +110,12 @@ function computeOutCode(x: number, y: number, box: BoundingBox): number {
   return code;
 }
 
-function clipPolyline(line: Polyline, box: BoundingBox): Polyline | null {
+function clipPolyline(line: Polyline, box: BoundingBox): Polyline | MultiPolyline | null {
   const pts = line.points;
   if (pts.length < 2) return null;
 
-  const resultPts: Point[] = [];
+  const segments: Point[][] = [];
+  let currentPts: Point[] = [];
 
   for (let i = 0; i < pts.length - 1; i++) {
     let x0 = pts[i].x;
@@ -157,21 +167,34 @@ function clipPolyline(line: Polyline, box: BoundingBox): Polyline | null {
     if (accept) {
       const p0 = makePoint(x0, y0);
       const p1 = makePoint(x1, y1);
-      if (resultPts.length === 0 || !pointsEqual(resultPts[resultPts.length - 1], p0)) {
-        resultPts.push(p0);
+      if (currentPts.length > 0 && !pointsEqual(currentPts[currentPts.length - 1], p0)) {
+        if (currentPts.length >= 2) segments.push(currentPts);
+        currentPts = [];
       }
-      resultPts.push(p1);
+      if (currentPts.length === 0) {
+        currentPts.push(p0);
+      }
+      if (!pointsEqual(p0, p1)) {
+        currentPts.push(p1);
+      }
+    } else if (currentPts.length > 0) {
+      if (currentPts.length >= 2) segments.push(currentPts);
+      currentPts = [];
     }
   }
 
-  return resultPts.length >= 2 ? makePolyline(resultPts) : null;
+  if (currentPts.length >= 2) {
+    segments.push(currentPts);
+  }
+
+  if (segments.length === 0) return null;
+  if (segments.length === 1) return makePolyline(segments[0]);
+  return makeMultiPolyline(segments.map((s) => makePolyline(s)));
 }
 
-function clipPolygon(polygon: Polygon, box: BoundingBox): Polygon | null {
-  const extRing = polygon.rings[0] ?? [];
-  if (extRing.length < 3) return null;
-
-  let outputList = extRing;
+function clipRingToBox(ring: Point[], box: BoundingBox): Point[] | null {
+  if (ring.length < 3) return null;
+  let outputList = ring;
 
   outputList = clipEdge(outputList, (p) => p.x >= box.minX);
   if (outputList.length < 3) return null;
@@ -185,11 +208,21 @@ function clipPolygon(polygon: Polygon, box: BoundingBox): Polygon | null {
   outputList = clipEdge(outputList, (p) => p.y <= box.maxY);
   if (outputList.length < 3) return null;
 
-  const closed = !pointsEqual(outputList[0], outputList[outputList.length - 1])
+  return !pointsEqual(outputList[0], outputList[outputList.length - 1])
     ? [...outputList, outputList[0]]
     : outputList;
+}
 
-  return makePolygonFromRing(closed);
+function clipPolygon(polygon: Polygon, box: BoundingBox): Polygon | null {
+  const extRing = clipRingToBox(polygon.rings[0] ?? [], box);
+  if (!extRing) return null;
+
+  const rings: Point[][] = [extRing];
+  for (let i = 1; i < polygon.rings.length; i++) {
+    const hole = clipRingToBox(polygon.rings[i], box);
+    if (hole) rings.push(hole);
+  }
+  return makePolygon(rings);
 }
 
 function clipEdge(ring: Point[], inside: (p: Point) => boolean): Point[] {

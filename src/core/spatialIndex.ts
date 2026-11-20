@@ -103,6 +103,7 @@ export class SpatialIndex {
     let bestLineDist = Number.MAX_VALUE;
 
     let foundPolygonFeature: Feature | null = null;
+    let bestPolygonArea = Number.MAX_VALUE;
 
     for (const f of candidates) {
       const geom = f.geometry;
@@ -146,23 +147,36 @@ export class SpatialIndex {
           break;
         }
         case GeometryType.POLYGON: {
-          if (polygonContainsPoint(geom, touchPoint) && !foundPolygonFeature) {
-            foundPolygonFeature = f;
+          if (polygonContainsPoint(geom, touchPoint)) {
+            const bb = getGeometryBoundingBox(geom);
+            const area = (bb.maxX - bb.minX) * (bb.maxY - bb.minY);
+            if (area < bestPolygonArea) {
+              bestPolygonArea = area;
+              foundPolygonFeature = f;
+            }
           }
           break;
         }
         case GeometryType.MULTI_POLYGON: {
-          if (
-            geom.polygons.some((p) => polygonContainsPoint(p, touchPoint)) &&
-            !foundPolygonFeature
-          ) {
-            foundPolygonFeature = f;
+          const hitPoly = geom.polygons.find((p) => polygonContainsPoint(p, touchPoint));
+          if (hitPoly) {
+            const bb = getGeometryBoundingBox(hitPoly);
+            const area = (bb.maxX - bb.minX) * (bb.maxY - bb.minY);
+            if (area < bestPolygonArea) {
+              bestPolygonArea = area;
+              foundPolygonFeature = f;
+            }
           }
           break;
         }
         default: {
-          if (bboxContains(getGeometryBoundingBox(geom), touchPoint.x, touchPoint.y) && !foundPolygonFeature) {
-            foundPolygonFeature = f;
+          const bb = getGeometryBoundingBox(geom);
+          if (bboxContains(bb, touchPoint.x, touchPoint.y)) {
+            const area = (bb.maxX - bb.minX) * (bb.maxY - bb.minY);
+            if (area < bestPolygonArea) {
+              bestPolygonArea = area;
+              foundPolygonFeature = f;
+            }
           }
           break;
         }

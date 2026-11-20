@@ -24,11 +24,13 @@ export function colorToCss(c: ColorRgba, layerOpacity = 1.0): string {
 }
 
 export function hexToColorRgba(hex: string, alpha = 1.0): ColorRgba {
-  const clean = hex.replace('#', '').padEnd(6, '0').slice(0, 6);
-  const num = parseInt(clean, 16);
-  if (Number.isNaN(num)) {
+  const raw = hex.replace('#', '').trim();
+  const expanded =
+    raw.length === 3 ? raw[0] + raw[0] + raw[1] + raw[1] + raw[2] + raw[2] : raw;
+  if (!/^[0-9a-fA-F]{6}$/.test(expanded)) {
     return makeColor(128, 128, 128, alpha);
   }
+  const num = parseInt(expanded, 16);
   return {
     red: (num >> 16) & 0xff,
     green: (num >> 8) & 0xff,

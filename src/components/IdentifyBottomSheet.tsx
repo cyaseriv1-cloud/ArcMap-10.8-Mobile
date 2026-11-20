@@ -98,7 +98,7 @@ export const IdentifyBottomSheet: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-8 z-40 flex justify-center px-3 pointer-events-none">
+    <div className="fixed inset-x-0 bottom-14 sm:bottom-9 z-40 flex justify-center px-3 pointer-events-none">
       <div
         className={`w-full max-w-md rounded-lg border shadow-2xl pointer-events-auto flex flex-col max-h-[65vh] ${
           isDark

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Edit3, Printer, Share2 } from 'lucide-react';
 import { colorToCss } from '../core/symbology';
-import { getBasemapById } from '../map/basemap';
+import { BasemapId, getBasemapById } from '../map/basemap';
 import { MapCanvasRenderer } from '../map/renderer';
 import { AppLanguage, useArcMap } from '../state/ArcMapContext';
 
@@ -18,6 +18,7 @@ export const ArcMapLayoutView: React.FC = () => {
     updateRender,
     cursorUtm,
     language,
+    setStatusMessage,
   } = useArcMap();
 
   const [showTitleDialog, setShowTitleDialog] = useState(false);
@@ -67,27 +68,64 @@ export const ArcMapLayoutView: React.FC = () => {
     return () => observer.disconnect();
   }, [updateRender]);
 
+  const saveDataUrlAsPng = (dataUrl: string, filename: string) => {
+    if (window.AndroidBridge?.saveBase64File) {
+      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+      window.AndroidBridge.saveBase64File(filename, 'image/png', base64);
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const handleExportPng = () => {
     updateRender();
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const filename = `${layoutTitle.replace(/[^a-zA-Z0-9_-]/g, '_') || 'mapa_layout'}.png`;
     try {
       const dataUrl = canvas.toDataURL('image/png');
-      const filename = `${layoutTitle.replace(/[^a-zA-Z0-9_-]/g, '_') || 'mapa_layout'}.png`;
-      if (window.AndroidBridge?.saveBase64File) {
-        const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-        window.AndroidBridge.saveBase64File(filename, 'image/png', base64);
-        return;
-      }
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      saveDataUrlAsPng(dataUrl, filename);
+      setStatusMessage(
+        isEs ? `✓ Lámina exportada: ${filename}` : `✓ Layout exported: ${filename}`
+      );
     } catch {
-      // Canvas may be tainted if non-CORS basemap tiles are active
-      window.print();
+      // Canvas was tainted by non-CORS basemap tiles (e.g. OpenTopoMap).
+      // Render a clean vector + graticule offscreen canvas so export still works in WebView.
+      try {
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = canvas.width;
+        exportCanvas.height = canvas.height;
+        const offCtx = exportCanvas.getContext('2d');
+        if (!offCtx) return;
+        const dpr = window.devicePixelRatio || 1;
+        offCtx.save();
+        offCtx.scale(dpr, dpr);
+        rendererRef.current.render({
+          ctx: offCtx,
+          viewport,
+          layers,
+          isDarkMode: false,
+          basemap: getBasemapById(BasemapId.NONE),
+          tileManager: null,
+        });
+        offCtx.restore();
+        const fallbackUrl = exportCanvas.toDataURL('image/png');
+        saveDataUrlAsPng(fallbackUrl, filename);
+        setStatusMessage(
+          isEs
+            ? `✓ Exportado sin mapa base externo (CORS): ${filename}`
+            : `✓ Exported without external basemap (CORS): ${filename}`
+        );
+      } catch {
+        setStatusMessage(
+          isEs ? 'No se pudo exportar la imagen PNG.' : 'Could not export PNG image.'
+        );
+      }
     }
   };
 
@@ -144,7 +182,7 @@ export const ArcMapLayoutView: React.FC = () => {
         </div>
 
         {/* Legend & Cartographic Metadata Box */}
-        <div className="w-full border border-black bg-[#FAFAFA] p-2 flex items-center justify-between gap-4 text-black">
+        <div className="w-full border border-black bg-[#FAFAFA] p-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 text-black">
           <div className="flex-1 min-w-0">
             <div className="text-[10px] font-bold mb-1">
               {isEs ? 'LEYENDA' : 'LEGEND'}
@@ -181,7 +219,7 @@ export const ArcMapLayoutView: React.FC = () => {
             </div>
           </div>
 
-          <div className="text-right text-[10px] shrink-0 leading-tight">
+          <div className="text-left sm:text-right text-[10px] shrink-0 leading-tight border-t sm:border-t-0 pt-1.5 sm:pt-0 border-black/15">
             <div className="font-bold">
               PROYECCIÓN: WGS 84 / UTM {cursorUtm.zone}
               {cursorUtm.hemisphere === 'NORTH' ? 'N' : 'S'}
