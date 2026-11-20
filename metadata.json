@@ -1,0 +1,7 @@
+{
+  "name": "ArcMap 10.8 (ArcGIS Desktop Mobile)",
+  "description": "Web GIS application inspired by Esri ArcGIS Desktop 10.8 featuring live XYZ basemaps, shapefile and GeoJSON support, spatial indexing, geoprocessing tools, attribute tables, and cartographic layout view.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

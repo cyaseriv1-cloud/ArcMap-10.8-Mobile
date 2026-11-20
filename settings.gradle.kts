@@ -5,7 +5,6 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -13,6 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-
-rootProject.name = "TerraAxis"
-include(":core", ":data", ":feature-map", ":feature-tools", ":ui")
+rootProject.name = "ArcMap108Mobile"
+include(":app")

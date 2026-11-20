@@ -1,46 +1,42 @@
-# 🗺️ ArcMap 10.8 (ArcGIS Desktop Mobile)
+# 🗺️ ArcMap 10.8 (ArcGIS Desktop Web)
 
-Versión móvil nativa para Android inspirada en la suite oficial **Esri ArcGIS Desktop 10.8 (ArcMap, ArcCatalog y ArcToolbox)**.
-
----
-
-## 📱 Instalación Inmediata
-El instalador APK listo para tu teléfono se encuentra en esta misma carpeta:
-* **[ArcMap-10.8-debug.apk](file:///d:/CURSOS%203/AGENTE%20ANTIGRAVITY/ArcMap_10.8_Mobile/ArcMap-10.8-debug.apk)** (16.1 MB)
+Aplicación web SIG inspirada en la suite oficial **Esri ArcGIS Desktop 10.8 (ArcMap, ArcCatalog y ArcToolbox)**, construida con **React, TypeScript, Vite y Tailwind CSS**.
 
 ---
 
 ## 🚀 Capacidades y Funcionalidades Integradas
 
 ### 1. Mapas Base Mundiales en Vivo (*Add Basemap*)
-* **OpenStreetMap (OSM):** Red vial global de calles, avenidas, comercios y números de casa.
+* **OpenStreetMap (OSM):** Red vial global de calles, avenidas, edificios y comercios.
 * **Esri World Imagery:** Fotografía satelital global de alta resolución de Esri.
 * **CartoDB Dark Matter:** Mapa base urbano oscuro de alto contraste para análisis nocturno.
-* **CartoDB Positron:** Mapa base claro y minimalista para resaltar capas temáticas de SIG.
+* **CartoDB Positron:** Mapa base claro y minimalista para resaltar capas temáticas SIG.
 * **OpenTopoMap:** Relieve y curvas de nivel topográficas.
-* **Caché Offline:** Los mapas visitados se almacenan en el teléfono para usarse sin internet en campo.
+* **Sin Mapa Base:** Lienzo cartográfico vectorial con cuadrícula de coordenadas.
 
-### 2. Buscador y Geocodificador Global (Lupa 🔍)
+### 2. Buscador y Geocodificador Global (Find 🔍)
 * **📍 Entidades Locales:** Búsqueda y zoom a capas vectoriales cargadas.
-* **🌍 Ciudades del Mundo:** Conectado a OpenStreetMap Nominatim. Busca cualquier ciudad (*París, Tokio, Madrid, Lima, Nueva York, etc.*) y vuela instantáneamente a ella con descarga de teselas en tiempo real.
+* **🌍 Ciudades del Mundo:** Conectado a OpenStreetMap Nominatim para buscar cualquier ciudad o dirección y centrar el mapa en tiempo real.
 
-### 3. GPS en Tiempo Real
-* Integración directa con los sensores GPS satelital y de red del dispositivo.
-* Botón de centrado con **punto azul y halo de precisión animado** (estilo Google Maps y ArcGIS Field Maps).
+### 3. GPS en Tiempo Real (Web Geolocation)
+* Integración con la API de geolocalización del navegador.
+* Botón de centrado con punto azul y halo de precisión, y botón de captura directa de puntos GPS como entidades vectoriales.
 
 ### 4. Interfaz Clásica ArcGIS Desktop 10.8
-* **Menús completos en Español e Inglés:** `Archivo`, `Edición`, `Ver`, `Selección`, `Geoprocesamiento`, `Ventanas`, `Ayuda`.
-* **Tema Claro y Tema Oscuro:** Selector ☀️ / 🌙 en la barra superior.
-* **Tabla de Contenidos (TOC):** Árbol jerárquico de capas con simbología cartográfica original.
-* **ArcCatalog:** Explorador de almacenamiento para importar Shapefiles (`.shp`, `.dbf`) y GeoJSON.
-* **ArcToolbox:** Geoprocesamiento con herramientas como Buffer, Clip, Simplificación y Selección por Atributos.
-* **Layout View:** Conmutador entre vista de datos y composición cartográfica con membrete, norte, escala y leyenda.
+* **Menús en Español e Inglés:** `Archivo`, `Edición`, `Ver`, `Selección`, `Geoprocesamiento`, `Ventanas`.
+* **Tema Claro y Tema Oscuro:** Selector ☀️ / 🌙 en la barra superior con sincronización automática de mapa base.
+* **Tabla de Contenidos (TOC):** Árbol jerárquico de capas con visibilidad, opacidad, orden de dibujo, propiedades de simbología (simple / valores únicos) y etiquetas.
+* **ArcCatalog (Add Data):** Importación de Shapefiles binarios (`.shp` + `.dbf`), GeoJSON (`.geojson`/`.json`) y paquete de muestra Esri (Cusco).
+* **ArcToolbox:** Geoprocesamiento con Buffer, Clip, Simplificación (Ramer-Douglas-Peucker), Selección por Atributos (SQL) y Exportación a Shapefile ZIP (`.shp`, `.shx`, `.dbf`, `.prj`).
+* **Tabla de Atributos & Calculate Geometry:** Ordenación, búsqueda, selección y cálculo geodésico de área, longitud/perímetro y centroides.
+* **Layout View:** Conmutador entre vista de datos y lámina cartográfica con título editable, leyenda, proyección UTM, escala y exportación a imagen PNG.
 
 ---
 
-## 📂 Estructura de Módulos del Proyecto
-* `:core` - Geometrías (Point, Polyline, Polygon), proyecciones (WGS84, Web Mercator, UTM), índices espaciales R-Tree y modelos de atributos.
-* `:data` - Parseador de ESRI Shapefile binario (`.shp`, `.shx`, `.dbf`), GeoJSON y gestión de proyectos.
-* `:feature-map` - Motor de renderizado en Canvas nativo a 60 fps, visor de teselas XYZ y sesiones de interacción.
-* `:feature-tools` - Algoritmos de geoprocesamiento (Buffer, Clip, Simplificación Douglas-Peucker).
-* `:ui` - Interfaz completa en Jetpack Compose con barras de herramientas, TOC, diálogos y vistas de mapa.
+## 📂 Estructura del Proyecto
+* `src/core/` - Geometrías (`Point`, `Polyline`, `Polygon`, multiparte), proyecciones (`WGS84`, `Web Mercator`, `UTM`), índice espacial de grilla y simbología.
+* `src/data/` - Parseador/escritor de ESRI Shapefile binario (`.shp`, `.shx`, `.dbf`, `.prj`), GeoJSON y gestor de proyectos.
+* `src/map/` - Motor de renderizado en HTML5 Canvas, gestor de teselas XYZ (`TileManager`), viewport y modos de interacción.
+* `src/tools/` - Algoritmos de geoprocesamiento (`BufferTool`, `ClipTool`, `SimplifyLineTool`, `AttributeQuery`).
+* `src/state/` - Estado global de la aplicación (`ArcMapContext`) y datos de muestra (`sampleData`).
+* `src/components/` - Interfaz completa en React con barras de herramientas clásicas, TOC, diálogos, tabla de atributos y vista de lámina.
