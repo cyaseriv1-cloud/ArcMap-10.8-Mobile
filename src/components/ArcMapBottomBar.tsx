@@ -29,7 +29,7 @@ export const ArcMapBottomBar: React.FC = () => {
 
   return (
     <footer
-      className={`w-full ${barBg} border-t ${borderCol} px-1.5 py-0.5 flex items-center gap-2 text-[10px] sm:text-[11px] select-none z-20`}
+      className={`w-full ${barBg} border-t ${borderCol} px-1.5 py-1 sm:py-0.5 flex items-center gap-2 text-[10px] sm:text-[11px] select-none z-20`}
     >
       {/* Classic Data View / Layout View / Refresh Switcher */}
       <div
@@ -39,7 +39,7 @@ export const ArcMapBottomBar: React.FC = () => {
           type="button"
           title="Data View"
           onClick={() => setViewMode(ArcMapViewMode.DATA_VIEW)}
-          className={`w-6 h-6 flex items-center justify-center rounded-[2px] border cursor-pointer ${
+          className={`w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] border cursor-pointer ${
             viewMode === ArcMapViewMode.DATA_VIEW
               ? isDark
                 ? 'bg-[#1E3A5F] border-[#0079C1] text-[#64B5F6]'
@@ -54,7 +54,7 @@ export const ArcMapBottomBar: React.FC = () => {
           type="button"
           title="Layout View"
           onClick={() => setViewMode(ArcMapViewMode.LAYOUT_VIEW)}
-          className={`w-6 h-6 flex items-center justify-center rounded-[2px] border cursor-pointer ${
+          className={`w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] border cursor-pointer ${
             viewMode === ArcMapViewMode.LAYOUT_VIEW
               ? isDark
                 ? 'bg-[#1E3A5F] border-[#0079C1] text-[#64B5F6]'
@@ -69,7 +69,7 @@ export const ArcMapBottomBar: React.FC = () => {
           type="button"
           title="Refresh"
           onClick={updateRender}
-          className={`w-6 h-6 flex items-center justify-center rounded-[2px] cursor-pointer ${
+          className={`w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] cursor-pointer ${
             isDark ? 'text-gray-300 hover:bg-[#30363D]' : 'text-gray-700 hover:bg-white/60'
           }`}
         >

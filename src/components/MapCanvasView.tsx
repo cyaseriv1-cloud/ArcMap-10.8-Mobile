@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Locate, LocateFixed, MapPinPlus } from 'lucide-react';
+import { Locate, LocateFixed, MapPinPlus, Maximize2, Minus, Plus } from 'lucide-react';
 import { getBasemapById } from '../map/basemap';
 import { MapToolMode } from '../map/interaction';
 import { MapCanvasRenderer } from '../map/renderer';
@@ -20,6 +20,9 @@ export const MapCanvasView: React.FC = () => {
     viewport,
     tileManager,
     handleMapTap,
+    zoomIn,
+    zoomOut,
+    zoomFullExtent,
     zoomAround,
     updateCoordinates,
     updateRender,
@@ -258,7 +261,7 @@ export const MapCanvasView: React.FC = () => {
   const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
     lastTouchTimeRef.current = Date.now();
     if (e.touches.length === 0) {
-      if (dragStateRef.current.isDown && dragStateRef.current.movedDistance < 8) {
+      if (dragStateRef.current.isDown && dragStateRef.current.movedDistance < 10) {
         handleMapTap(dragStateRef.current.startX, dragStateRef.current.startY);
       }
       dragStateRef.current.isDown = false;
@@ -293,8 +296,48 @@ export const MapCanvasView: React.FC = () => {
       {/* Measure & Digitize HUD */}
       <MeasureHud />
 
-      {/* Floating GPS Action Buttons */}
+      {/* Floating Right Controls: Thumb Zoom + GPS Actions */}
       <div className="absolute right-3 bottom-3 flex flex-col items-end gap-2 z-10">
+        {/* Compact Zoom & Extent Control Stack */}
+        <div
+          className={`flex flex-col rounded-xl shadow-md border overflow-hidden ${
+            isDark
+              ? 'bg-[#1E222B]/95 border-[#384252] text-[#E6EDF3]'
+              : 'bg-white/95 border-[#CBD5E1] text-slate-800'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={zoomIn}
+            title="Zoom In"
+            className={`w-10 h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
+              isDark ? 'hover:bg-white/10 border-b border-[#384252]' : 'hover:bg-slate-100 border-b border-slate-200'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={zoomOut}
+            title="Zoom Out"
+            className={`w-10 h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
+              isDark ? 'hover:bg-white/10 border-b border-[#384252]' : 'hover:bg-slate-100 border-b border-slate-200'
+            }`}
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={zoomFullExtent}
+            title="Full Extent"
+            className={`w-10 h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
+              isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'
+            }`}
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-[#0079C1]" />
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={requestGpsAndCapture}

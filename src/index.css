@@ -12,4 +12,17 @@
     overflow: hidden;
     font-family: "Segoe UI", Tahoma, -apple-system, BlinkMacSystemFont, sans-serif;
   }
+
+  button,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

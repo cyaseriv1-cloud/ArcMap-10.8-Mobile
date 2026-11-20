@@ -33,6 +33,7 @@ const ArcMapWorkspace: React.FC = () => {
     isBasemapDialogVisible,
     isNewLayerDialogVisible,
     pendingFeatureDraft,
+    pendingDeleteCandidate,
     activeTool,
     toggleToc,
     dismissIdentify,
@@ -43,12 +44,17 @@ const ArcMapWorkspace: React.FC = () => {
     closeBasemapDialog,
     closeNewLayerDialog,
     cancelPendingFeature,
+    cancelPendingDelete,
     setViewMode,
     setTool,
   } = useArcMap();
 
   useEffect(() => {
     const handleBackOrEscape = (): boolean => {
+      if (pendingDeleteCandidate) {
+        cancelPendingDelete();
+        return true;
+      }
       if (pendingFeatureDraft) {
         cancelPendingFeature();
         return true;
@@ -111,6 +117,7 @@ const ArcMapWorkspace: React.FC = () => {
     };
   }, [
     activeTool,
+    cancelPendingDelete,
     cancelPendingFeature,
     closeAttributeTable,
     closeBasemapDialog,
@@ -124,6 +131,7 @@ const ArcMapWorkspace: React.FC = () => {
     isSearchVisible,
     isTocVisible,
     isToolboxVisible,
+    pendingDeleteCandidate,
     pendingFeatureDraft,
     setTool,
     setViewMode,

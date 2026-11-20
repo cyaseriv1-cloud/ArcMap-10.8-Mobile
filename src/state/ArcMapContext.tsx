@@ -39,7 +39,12 @@ import { GeoJsonParser } from '../data/geoJsonParser';
 import { ShapefileReader } from '../data/shapefileReader';
 import { ShapefileWriter } from '../data/shapefileWriter';
 import { BasemapId } from '../map/basemap';
-import { DigitizeSession, MapToolMode, MeasureSession } from '../map/interaction';
+import {
+  DigitizeSession,
+  MapToolMode,
+  MeasureSession,
+  getToolDisplayName,
+} from '../map/interaction';
 import { TileManager } from '../map/tileManager';
 import { MapViewport } from '../map/viewport';
 import { AttributeQuery } from '../tools/attributeQuery';
@@ -77,6 +82,13 @@ export interface PendingFeatureDraft {
   nextId: number;
   isPointCapture: boolean;
   prefillAttributes?: Record<string, AttributeValue>;
+}
+
+export interface PendingDeleteCandidate {
+  layerId: string;
+  layerName: string;
+  featureId: number;
+  label: string;
 }
 
 function getExpectedGeometryForTool(tool: MapToolMode): GeometryType | null {
@@ -130,6 +142,7 @@ interface ArcMapContextValue {
   isNewLayerDialogVisible: boolean;
   newLayerDefaultGeomType: GeometryType;
   pendingFeatureDraft: PendingFeatureDraft | null;
+  pendingDeleteCandidate: PendingDeleteCandidate | null;
   layoutTitle: string;
   isEditorActive: boolean;
   layers: VectorLayer[];
@@ -161,6 +174,8 @@ interface ArcMapContextValue {
   completeDigitizing: () => void;
   commitPendingFeature: (attributes: Record<string, AttributeValue>) => void;
   cancelPendingFeature: () => void;
+  confirmPendingDelete: () => void;
+  cancelPendingDelete: () => void;
   openNewLayerDialog: (defaultGeom?: GeometryType, resumeTool?: MapToolMode | null) => void;
   closeNewLayerDialog: () => void;
   createNewLayer: (name: string, geometryType: GeometryType, fields: Field[]) => void;
@@ -260,6 +275,8 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [pendingFeatureDraft, setPendingFeatureDraft] = useState<PendingFeatureDraft | null>(
     null
   );
+  const [pendingDeleteCandidate, setPendingDeleteCandidate] =
+    useState<PendingDeleteCandidate | null>(null);
 
   const [layoutTitle, setLayoutTitleState] = useState('MAPA GENERAL DE COBERTURA');
   const [isEditorActive, setIsEditorActive] = useState(false);
@@ -434,6 +451,7 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         tool === MapToolMode.MEASURE_DISTANCE || tool === MapToolMode.MEASURE_AREA;
 
       setActiveTool(tool);
+      setPendingDeleteCandidate(null);
 
       if (isNowMeasuring) {
         const areaMode = tool === MapToolMode.MEASURE_AREA;
@@ -456,7 +474,10 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         );
       }
 
-      setStatusMessage(`Herramienta activa: ${tool}`);
+      const label = getToolDisplayName(tool, language === AppLanguage.ES);
+      setStatusMessage(
+        language === AppLanguage.ES ? `Herramienta: ${label}` : `Tool: ${label}`
+      );
       updateRender();
     },
     [activeLayer, activeTool, language, openNewLayerDialog, updateRender]
@@ -484,7 +505,7 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const performIdentify = useCallback(
     (tapPoint: Point) => {
-      const tolerance = (viewportRef.current.metersPerPixel * 24.0) / 111320.0;
+      const tolerance = (viewportRef.current.groundMetersPerPixel * 26.0) / 111320.0;
       for (const layer of layers) {
         if (!layer.isVisible) continue;
         const index = new SpatialIndex();
@@ -505,9 +526,47 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [layers, updateRender]
   );
 
+  const performDeleteTap = useCallback(
+    (tapPoint: Point) => {
+      const tolerance = (viewportRef.current.groundMetersPerPixel * 26.0) / 111320.0;
+      const ordered = activeLayer
+        ? [activeLayer, ...layers.filter((l) => l.id !== activeLayer.id)]
+        : layers;
+
+      for (const layer of ordered) {
+        if (!layer.isVisible) continue;
+        const index = new SpatialIndex();
+        index.build(layer.features);
+        const found = index.hitTest(tapPoint, tolerance);
+        if (found) {
+          const rawLabel = found.attributes['NOMBRE'] ?? found.attributes['NAME'];
+          const label =
+            rawLabel !== null && rawLabel !== undefined && String(rawLabel).trim() !== ''
+              ? String(rawLabel)
+              : `#${found.id}`;
+          setPendingDeleteCandidate({
+            layerId: layer.id,
+            layerName: layer.name,
+            featureId: found.id,
+            label,
+          });
+          setStatusMessage(`Confirmar borrado: ${label} (${layer.name})`);
+          return;
+        }
+      }
+      setPendingDeleteCandidate(null);
+      setStatusMessage(
+        language === AppLanguage.ES
+          ? 'Toca una entidad visible para eliminarla'
+          : 'Tap a visible feature to delete it'
+      );
+    },
+    [activeLayer, language, layers]
+  );
+
   const performSelect = useCallback(
     (tapPoint: Point) => {
-      const tolerance = (viewportRef.current.metersPerPixel * 24.0) / 111320.0;
+      const tolerance = (viewportRef.current.groundMetersPerPixel * 26.0) / 111320.0;
 
       if (activeLayer && activeLayer.isVisible) {
         const index = new SpatialIndex();
@@ -607,6 +666,9 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         case MapToolMode.DIGITIZE_POINT:
           beginPointCaptureDraft(geoPoint);
           break;
+        case MapToolMode.DELETE_FEATURE:
+          performDeleteTap(geoPoint);
+          break;
         case MapToolMode.DIGITIZE_LINE:
         case MapToolMode.DIGITIZE_POLYGON: {
           if (!isLayerCompatibleWithTool(activeTool, activeLayer)) {
@@ -631,6 +693,7 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       beginPointCaptureDraft,
       identifiedFeatureIds,
       openNewLayerDialog,
+      performDeleteTap,
       performIdentify,
       performSelect,
       updateCoordinates,
@@ -754,6 +817,22 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     [identifiedFeatureIds, updateRender]
   );
+
+  const confirmPendingDelete = useCallback(() => {
+    if (!pendingDeleteCandidate) return;
+    const { layerId, featureId, label, layerName } = pendingDeleteCandidate;
+    deleteFeature(layerId, featureId);
+    setPendingDeleteCandidate(null);
+    setStatusMessage(
+      language === AppLanguage.ES
+        ? `✓ Entidad '${label}' eliminada de ${layerName}`
+        : `✓ Deleted '${label}' from ${layerName}`
+    );
+  }, [deleteFeature, language, pendingDeleteCandidate]);
+
+  const cancelPendingDelete = useCallback(() => {
+    setPendingDeleteCandidate(null);
+  }, []);
 
   const deleteSelectedFeatures = useCallback(
     (layerId: string) => {
@@ -1060,24 +1139,41 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const toggleEditor = useCallback(
     (active: boolean) => {
       setIsEditorActive(active);
+      setPendingDeleteCandidate(null);
       if (
         !active &&
         (activeTool === MapToolMode.DIGITIZE_POINT ||
           activeTool === MapToolMode.DIGITIZE_LINE ||
-          activeTool === MapToolMode.DIGITIZE_POLYGON)
+          activeTool === MapToolMode.DIGITIZE_POLYGON ||
+          activeTool === MapToolMode.DELETE_FEATURE)
       ) {
         setActiveTool(MapToolMode.PAN);
         setDigitizeSession(new DigitizeSession());
       }
       setStatusMessage(
-        active ? 'Editor iniciado: Listo para digitalizar' : 'Editor detenido'
+        active
+          ? language === AppLanguage.ES
+            ? 'Editor iniciado: +Punto, +Línea, +Polígono o Borrar'
+            : 'Editor started: +Point, +Line, +Polygon, or Delete'
+          : language === AppLanguage.ES
+            ? 'Editor detenido'
+            : 'Editor stopped'
       );
       updateRender();
     },
-    [activeTool, updateRender]
+    [activeTool, language, updateRender]
   );
 
   const clearAllSelections = useCallback(() => {
+    const totalSelected = layers.reduce((acc, l) => acc + l.selectedFeatureIds.size, 0);
+    if (totalSelected === 0) {
+      setStatusMessage(
+        language === AppLanguage.ES
+          ? 'Sin selección (el borrador deselecciona; para borrar usa Editor > Borrar o Identificar)'
+          : 'No active selection (eraser clears selection; use Editor > Delete to remove features)'
+      );
+      return;
+    }
     setLayers((prev) =>
       prev.map((l) =>
         l.selectedFeatureIds.size > 0
@@ -1085,9 +1181,13 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           : l
       )
     );
-    setStatusMessage('Selección limpiada');
+    setStatusMessage(
+      language === AppLanguage.ES
+        ? `✓ Selección limpiada (${totalSelected} deseleccionadas)`
+        : `✓ Selection cleared (${totalSelected} deselected)`
+    );
     updateRender();
-  }, [updateRender]);
+  }, [language, layers, updateRender]);
 
   const clearAllLayers = useCallback(() => {
     setLayers([]);
@@ -1564,6 +1664,7 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isNewLayerDialogVisible,
     newLayerDefaultGeomType,
     pendingFeatureDraft,
+    pendingDeleteCandidate,
     layoutTitle,
     isEditorActive,
     layers,
@@ -1595,6 +1696,8 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     completeDigitizing,
     commitPendingFeature,
     cancelPendingFeature,
+    confirmPendingDelete,
+    cancelPendingDelete,
     openNewLayerDialog,
     closeNewLayerDialog,
     createNewLayer,

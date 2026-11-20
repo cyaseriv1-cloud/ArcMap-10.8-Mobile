@@ -72,13 +72,17 @@ export const ArcMapClassicTopBar: React.FC = () => {
   const isEs = language === AppLanguage.ES;
 
   useEffect(() => {
-    const onOutside = (e: MouseEvent) => {
+    const onOutside = (e: MouseEvent | TouchEvent) => {
       if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
         setActiveMenu(null);
       }
     };
     document.addEventListener('mousedown', onOutside);
-    return () => document.removeEventListener('mousedown', onOutside);
+    document.addEventListener('touchstart', onOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', onOutside);
+      document.removeEventListener('touchstart', onOutside);
+    };
   }, []);
 
   const menuDefs: { key: Exclude<MenuKey, null>; label: string }[] = isEs
@@ -158,12 +162,15 @@ export const ArcMapClassicTopBar: React.FC = () => {
 
       {/* 2. Classic Menu Bar */}
       <div className={`w-full ${menuBarBg} border-b ${borderColor} px-1 py-0.5 flex items-center flex-wrap gap-0.5`}>
-        {menuDefs.map((m) => (
+        {menuDefs.map((m) => {
+          const alignRightOnMobile =
+            m.key === 'selection' || m.key === 'geoprocessing' || m.key === 'windows';
+          return (
           <div key={m.key} className="relative">
             <button
               type="button"
               onClick={() => setActiveMenu((prev) => (prev === m.key ? null : m.key))}
-              className={`px-1.5 sm:px-2 py-0.5 text-[11px] sm:text-xs rounded-[2px] cursor-pointer whitespace-nowrap ${textColor} ${
+              className={`px-2 py-1 sm:py-0.5 text-xs rounded-[2px] cursor-pointer whitespace-nowrap ${textColor} ${
                 activeMenu === m.key
                   ? isDark
                     ? 'bg-[#30363D] font-bold'
@@ -178,7 +185,9 @@ export const ArcMapClassicTopBar: React.FC = () => {
 
             {activeMenu === m.key && (
               <div
-                className={`absolute left-0 top-full mt-0.5 min-w-[240px] border shadow-lg rounded-[3px] py-1 z-50 text-xs ${dropdownBg}`}
+                className={`absolute ${
+                  alignRightOnMobile ? 'right-0 sm:left-0 sm:right-auto' : 'left-0'
+                } top-full mt-0.5 min-w-[235px] max-w-[92vw] border shadow-lg rounded-[3px] py-1 z-50 text-xs ${dropdownBg}`}
               >
                 {m.key === 'file' && (
                   <>
@@ -440,40 +449,53 @@ export const ArcMapClassicTopBar: React.FC = () => {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* 3. Standard & Tools Toolbar */}
-      <div className="w-full px-1.5 py-1 flex items-center flex-wrap gap-1">
+      {/* 3. Standard & Tools Toolbar (horizontally scrollable with touch-friendly labels on mobile) */}
+      <div className="w-full px-1.5 py-1 flex items-center flex-nowrap overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible gap-1">
         {/* Classic Add Data (+) */}
         <button
           type="button"
           onClick={() => toggleCatalog(true)}
-          className="flex items-center gap-1 bg-[#FFD54F] hover:bg-[#FFCA28] text-black font-bold text-[11px] px-2 py-1 rounded-[3px] shadow-xs border border-[#D4A72C] shrink-0 cursor-pointer whitespace-nowrap"
+          className="h-[42px] sm:h-7 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 bg-[#FFD54F] hover:bg-[#FFCA28] text-black font-bold text-[10px] sm:text-[11px] px-2.5 sm:px-2 py-1 rounded-[3px] shadow-xs border border-[#D4A72C] shrink-0 cursor-pointer whitespace-nowrap"
           title="Add Data (ArcCatalog)"
         >
-          <Plus className="w-3.5 h-3.5 text-black" strokeWidth={2.75} />
-          <span>{isEs ? 'Añadir Datos' : 'Add Data'}</span>
+          <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-black" strokeWidth={2.75} />
+          <span>{isEs ? 'Datos' : 'Add Data'}</span>
         </button>
 
         {/* Classic Basemap */}
         <button
           type="button"
           onClick={openBasemapDialog}
-          className={`flex items-center gap-1 font-bold text-[11px] px-2 py-1 rounded-[3px] shadow-xs border shrink-0 cursor-pointer whitespace-nowrap ${
+          className={`h-[42px] sm:h-7 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 font-bold text-[10px] sm:text-[11px] px-2.5 sm:px-2 py-1 rounded-[3px] shadow-xs border shrink-0 cursor-pointer whitespace-nowrap ${
             isDark
               ? 'bg-[#1E3A5F] hover:bg-[#254A78] text-white border-[#2E598F]'
               : 'bg-[#E3F2FD] hover:bg-[#BBDEFB] text-[#0D47A1] border-[#90CAF9]'
           }`}
           title={isEs ? 'Añadir Mapa Base' : 'Add Basemap'}
         >
-          <Layers className="w-3.5 h-3.5 text-[#0079C1]" />
-          <span>{isEs ? 'Mapa Base' : 'Basemap'}</span>
+          <Layers className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#0079C1]" />
+          <span>{isEs ? 'Base' : 'Basemap'}</span>
         </button>
+
+        {/* Table of Contents (placed early on mobile for quick layer access) */}
+        <ToolbarIconButton
+          title="Table of Contents"
+          mobileLabel={isEs ? 'Capas' : 'Layers'}
+          isSelected={isTocVisible}
+          isDark={isDark}
+          onClick={() => toggleToc(!isTocVisible)}
+        >
+          <SlidersHorizontal className="w-4 h-4 text-[#0079C1]" />
+        </ToolbarIconButton>
 
         {/* Search / Find */}
         <ToolbarIconButton
           title={isEs ? 'Buscar Calles y Lugares' : 'Find Places & Streets'}
+          mobileLabel={isEs ? 'Buscar' : 'Find'}
           isDark={isDark}
           onClick={() => toggleSearch(true)}
         >
@@ -483,6 +505,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
         {/* ArcCatalog */}
         <ToolbarIconButton
           title="ArcCatalog"
+          mobileLabel="Catálogo"
           isDark={isDark}
           onClick={() => toggleCatalog(true)}
         >
@@ -492,27 +515,19 @@ export const ArcMapClassicTopBar: React.FC = () => {
         {/* ArcToolbox */}
         <ToolbarIconButton
           title="ArcToolbox"
+          mobileLabel="Toolbox"
           isDark={isDark}
           onClick={() => toggleToolbox(true)}
         >
           <Wrench className="w-4 h-4 text-[#D32F2F]" />
         </ToolbarIconButton>
 
-        {/* Table of Contents */}
-        <ToolbarIconButton
-          title="Table of Contents"
-          isSelected={isTocVisible}
-          isDark={isDark}
-          onClick={() => toggleToc(!isTocVisible)}
-        >
-          <SlidersHorizontal className="w-4 h-4 text-[#0079C1]" />
-        </ToolbarIconButton>
-
-        <div className={`w-px h-5 mx-0.5 shrink-0 ${isDark ? 'bg-[#30363D]' : 'bg-[#B0B0B0]'}`} />
+        <div className={`w-px h-7 sm:h-5 mx-0.5 shrink-0 ${isDark ? 'bg-[#30363D]' : 'bg-[#B0B0B0]'}`} />
 
         {/* Map Tools */}
         <ToolbarIconButton
           title="Pan"
+          mobileLabel={isEs ? 'Mover' : 'Pan'}
           isSelected={activeTool === MapToolMode.PAN}
           isDark={isDark}
           onClick={() => setTool(MapToolMode.PAN)}
@@ -520,20 +535,9 @@ export const ArcMapClassicTopBar: React.FC = () => {
           <Hand className="w-4 h-4" />
         </ToolbarIconButton>
 
-        <ToolbarIconButton title="Zoom In" isDark={isDark} onClick={zoomIn}>
-          <ZoomIn className="w-4 h-4" />
-        </ToolbarIconButton>
-
-        <ToolbarIconButton title="Zoom Out" isDark={isDark} onClick={zoomOut}>
-          <ZoomOut className="w-4 h-4" />
-        </ToolbarIconButton>
-
-        <ToolbarIconButton title="Full Extent" isDark={isDark} onClick={zoomFullExtent}>
-          <Maximize2 className="w-4 h-4" />
-        </ToolbarIconButton>
-
         <ToolbarIconButton
           title="Select Features"
+          mobileLabel={isEs ? 'Selec.' : 'Select'}
           isSelected={activeTool === MapToolMode.SELECT}
           isDark={isDark}
           onClick={() => setTool(MapToolMode.SELECT)}
@@ -546,7 +550,8 @@ export const ArcMapClassicTopBar: React.FC = () => {
         </ToolbarIconButton>
 
         <ToolbarIconButton
-          title="Clear Selection"
+          title={isEs ? 'Limpiar Selección (Deseleccionar)' : 'Clear Selection'}
+          mobileLabel={isEs ? 'Desel.' : 'Clear'}
           isDark={isDark}
           onClick={clearAllSelections}
         >
@@ -555,6 +560,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
 
         <ToolbarIconButton
           title="Identify"
+          mobileLabel="Info"
           isSelected={activeTool === MapToolMode.IDENTIFY}
           isDark={isDark}
           onClick={() => setTool(MapToolMode.IDENTIFY)}
@@ -563,7 +569,8 @@ export const ArcMapClassicTopBar: React.FC = () => {
         </ToolbarIconButton>
 
         <ToolbarIconButton
-          title={isEs ? 'Medir Distancia' : 'Measure Distance'}
+          title={isEs ? 'Medir Distancia / Área' : 'Measure Distance / Area'}
+          mobileLabel={isEs ? 'Medir' : 'Measure'}
           isSelected={
             activeTool === MapToolMode.MEASURE_DISTANCE ||
             activeTool === MapToolMode.MEASURE_AREA
@@ -580,11 +587,39 @@ export const ArcMapClassicTopBar: React.FC = () => {
           <Ruler className="w-4 h-4 text-[#E91E63]" />
         </ToolbarIconButton>
 
-        <div className={`w-px h-5 mx-0.5 shrink-0 ${isDark ? 'bg-[#30363D]' : 'bg-[#B0B0B0]'}`} />
+        <ToolbarIconButton
+          title="Zoom In"
+          mobileLabel="Zoom+"
+          isDark={isDark}
+          onClick={zoomIn}
+        >
+          <ZoomIn className="w-4 h-4" />
+        </ToolbarIconButton>
+
+        <ToolbarIconButton
+          title="Zoom Out"
+          mobileLabel="Zoom-"
+          isDark={isDark}
+          onClick={zoomOut}
+        >
+          <ZoomOut className="w-4 h-4" />
+        </ToolbarIconButton>
+
+        <ToolbarIconButton
+          title="Full Extent"
+          mobileLabel={isEs ? 'Todo' : 'Extent'}
+          isDark={isDark}
+          onClick={zoomFullExtent}
+        >
+          <Maximize2 className="w-4 h-4" />
+        </ToolbarIconButton>
+
+        <div className={`w-px h-7 sm:h-5 mx-0.5 shrink-0 ${isDark ? 'bg-[#30363D]' : 'bg-[#B0B0B0]'}`} />
 
         {/* Editor Toggle */}
         <ToolbarIconButton
           title="Editor"
+          mobileLabel={isEs ? 'Editar' : 'Editor'}
           isSelected={isEditorActive}
           isDark={isDark}
           onClick={() => toggleEditor(!isEditorActive)}
@@ -600,6 +635,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
           <>
             <ToolbarIconButton
               title={isEs ? '+Punto' : '+Point'}
+              mobileLabel={isEs ? '+Punto' : '+Point'}
               isSelected={activeTool === MapToolMode.DIGITIZE_POINT}
               isDark={isDark}
               onClick={() => setTool(MapToolMode.DIGITIZE_POINT)}
@@ -608,6 +644,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
             </ToolbarIconButton>
             <ToolbarIconButton
               title={isEs ? '+Línea' : '+Line'}
+              mobileLabel={isEs ? '+Línea' : '+Line'}
               isSelected={activeTool === MapToolMode.DIGITIZE_LINE}
               isDark={isDark}
               onClick={() => setTool(MapToolMode.DIGITIZE_LINE)}
@@ -616,11 +653,25 @@ export const ArcMapClassicTopBar: React.FC = () => {
             </ToolbarIconButton>
             <ToolbarIconButton
               title={isEs ? '+Polígono' : '+Polygon'}
+              mobileLabel={isEs ? '+Políg.' : '+Poly'}
               isSelected={activeTool === MapToolMode.DIGITIZE_POLYGON}
               isDark={isDark}
               onClick={() => setTool(MapToolMode.DIGITIZE_POLYGON)}
             >
               <SquareDashedMousePointer className="w-4 h-4" />
+            </ToolbarIconButton>
+            <ToolbarIconButton
+              title={isEs ? 'Borrar Entidad al Tocar' : 'Delete Feature on Tap'}
+              mobileLabel={isEs ? 'Borrar' : 'Delete'}
+              isSelected={activeTool === MapToolMode.DELETE_FEATURE}
+              isDark={isDark}
+              onClick={() => setTool(MapToolMode.DELETE_FEATURE)}
+            >
+              <Trash2
+                className={`w-4 h-4 ${
+                  activeTool === MapToolMode.DELETE_FEATURE ? 'text-[#E53935]' : 'text-[#D32F2F]'
+                }`}
+              />
             </ToolbarIconButton>
           </>
         )}
@@ -638,7 +689,7 @@ const MenuItem: React.FC<{
   <button
     type="button"
     onClick={onClick}
-    className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left cursor-pointer ${hoverClass}`}
+    className={`w-full flex items-center gap-2.5 px-3 py-2.5 sm:py-1.5 text-[13px] sm:text-xs text-left cursor-pointer ${hoverClass}`}
   >
     <span className="shrink-0">{icon}</span>
     <span className="truncate">{label}</span>
@@ -651,11 +702,12 @@ const MenuDivider: React.FC<{ isDark: boolean }> = ({ isDark }) => (
 
 const ToolbarIconButton: React.FC<{
   title: string;
+  mobileLabel?: string;
   isSelected?: boolean;
   isDark: boolean;
   onClick: () => void;
   children: React.ReactNode;
-}> = ({ title, isSelected = false, isDark, onClick, children }) => {
+}> = ({ title, mobileLabel, isSelected = false, isDark, onClick, children }) => {
   const bgClass = isSelected
     ? isDark
       ? 'bg-[#1E3A5F] border-[#0079C1] text-[#64B5F6]'
@@ -669,9 +721,14 @@ const ToolbarIconButton: React.FC<{
       type="button"
       title={title}
       onClick={onClick}
-      className={`w-7 h-7 flex items-center justify-center rounded-[3px] border shrink-0 cursor-pointer transition-colors ${bgClass}`}
+      className={`min-w-[42px] h-[42px] px-1.5 flex flex-col items-center justify-center gap-0.5 sm:flex-row sm:min-w-0 sm:w-7 sm:h-7 sm:px-0 rounded-[3px] border shrink-0 cursor-pointer transition-colors ${bgClass}`}
     >
       {children}
+      {mobileLabel && (
+        <span className="sm:hidden text-[9px] leading-none font-medium whitespace-nowrap">
+          {mobileLabel}
+        </span>
+      )}
     </button>
   );
 };

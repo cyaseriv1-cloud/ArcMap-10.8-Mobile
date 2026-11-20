@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Trash2, Undo2 } from 'lucide-react';
+import { Check, Trash2, Undo2, X } from 'lucide-react';
 import { MapToolMode } from '../map/interaction';
 import { AppLanguage, ArcMapTheme, useArcMap } from '../state/ArcMapContext';
 
@@ -8,6 +8,7 @@ export const MeasureHud: React.FC = () => {
     activeTool,
     measureSession,
     digitizeSession,
+    pendingDeleteCandidate,
     theme,
     language,
     setTool,
@@ -16,14 +17,17 @@ export const MeasureHud: React.FC = () => {
     undoDigitizePoint,
     clearDigitizeSession,
     completeDigitizing,
+    confirmPendingDelete,
+    cancelPendingDelete,
   } = useArcMap();
 
   const isMeasuring =
     activeTool === MapToolMode.MEASURE_DISTANCE || activeTool === MapToolMode.MEASURE_AREA;
   const isDigitizing =
     activeTool === MapToolMode.DIGITIZE_LINE || activeTool === MapToolMode.DIGITIZE_POLYGON;
+  const isDeleting = activeTool === MapToolMode.DELETE_FEATURE;
 
-  if (!isMeasuring && !isDigitizing) return null;
+  if (!isMeasuring && !isDigitizing && !isDeleting) return null;
 
   const isDark = theme === ArcMapTheme.DARK;
   const isEs = language === AppLanguage.ES;
@@ -34,11 +38,11 @@ export const MeasureHud: React.FC = () => {
 
   return (
     <div className="absolute bottom-14 left-3 right-16 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 sm:w-[340px]">
-      <div className={`rounded-lg border shadow-xl p-3 flex flex-col gap-2 ${cardBg}`}>
+      <div className={`rounded-lg border shadow-xl p-2.5 sm:p-3 flex flex-col gap-2 ${cardBg}`}>
         {isMeasuring && (
           <>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-[#0079C1]">
+              <span className="text-xs font-bold text-[#0079C1] truncate">
                 {activeTool === MapToolMode.MEASURE_DISTANCE
                   ? isEs
                     ? 'Medición de Distancia'
@@ -47,11 +51,11 @@ export const MeasureHud: React.FC = () => {
                     ? 'Medición de Área'
                     : 'Area Measurement'}
               </span>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   onClick={() => setTool(MapToolMode.MEASURE_DISTANCE)}
-                  className={`px-2 py-0.5 text-[10px] font-semibold rounded cursor-pointer ${
+                  className={`px-2 py-1 text-[10px] font-semibold rounded cursor-pointer ${
                     activeTool === MapToolMode.MEASURE_DISTANCE
                       ? 'bg-[#0079C1] text-white'
                       : isDark
@@ -64,7 +68,7 @@ export const MeasureHud: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setTool(MapToolMode.MEASURE_AREA)}
-                  className={`px-2 py-0.5 text-[10px] font-semibold rounded cursor-pointer ${
+                  className={`px-2 py-1 text-[10px] font-semibold rounded cursor-pointer ${
                     activeTool === MapToolMode.MEASURE_AREA
                       ? 'bg-[#0079C1] text-white'
                       : isDark
@@ -73,6 +77,14 @@ export const MeasureHud: React.FC = () => {
                   }`}
                 >
                   {isEs ? 'Área' : 'Area'}
+                </button>
+                <button
+                  type="button"
+                  title={isEs ? 'Cerrar medición' : 'Close measure'}
+                  onClick={() => setTool(MapToolMode.PAN)}
+                  className="p-1 rounded hover:bg-black/10 cursor-pointer opacity-70 hover:opacity-100"
+                >
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -95,16 +107,16 @@ export const MeasureHud: React.FC = () => {
             <div className="text-[11px] opacity-70">
               {measureSession.points.length}{' '}
               {isEs
-                ? 'vértices marcados (haz clic en el mapa para agregar)'
-                : 'vertices marked (click map to add)'}
+                ? 'vértices marcados (toca el mapa para agregar)'
+                : 'vertices marked (tap map to add)'}
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-0.5">
               <button
                 type="button"
                 disabled={measureSession.points.length === 0}
                 onClick={undoMeasurePoint}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-current/25 disabled:opacity-40 cursor-pointer"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs rounded border border-current/25 disabled:opacity-40 cursor-pointer"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 <span>{isEs ? 'Deshacer' : 'Undo'}</span>
@@ -113,7 +125,7 @@ export const MeasureHud: React.FC = () => {
               <button
                 type="button"
                 onClick={clearMeasureSession}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs rounded bg-[#0079C1] text-white cursor-pointer"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-[#0079C1] text-white cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isEs ? 'Limpiar' : 'Clear'}</span>
@@ -124,25 +136,35 @@ export const MeasureHud: React.FC = () => {
 
         {isDigitizing && (
           <>
-            <span className="text-xs font-bold text-[#0079C1]">
-              {activeTool === MapToolMode.DIGITIZE_POLYGON
-                ? isEs
-                  ? 'Digitalización de Polígono'
-                  : 'Polygon Digitizing'
-                : isEs
-                  ? 'Digitalización de Línea'
-                  : 'Line Digitizing'}
-            </span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-[#0079C1]">
+                {activeTool === MapToolMode.DIGITIZE_POLYGON
+                  ? isEs
+                    ? 'Digitalización de Polígono'
+                    : 'Polygon Digitizing'
+                  : isEs
+                    ? 'Digitalización de Línea'
+                    : 'Line Digitizing'}
+              </span>
+              <button
+                type="button"
+                title={isEs ? 'Salir de digitalización' : 'Exit digitizing'}
+                onClick={() => setTool(MapToolMode.PAN)}
+                className="p-1 rounded hover:bg-black/10 cursor-pointer opacity-70 hover:opacity-100"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <div className="text-sm font-medium">
               {digitizeSession.points.length}{' '}
               {isEs ? 'vértices agregados' : 'vertices added'}
             </div>
-            <div className="flex items-center flex-wrap gap-2 pt-1">
+            <div className="flex items-center flex-wrap gap-2 pt-0.5">
               <button
                 type="button"
                 disabled={digitizeSession.points.length === 0}
                 onClick={undoDigitizePoint}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-current/25 disabled:opacity-40 cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-current/25 disabled:opacity-40 cursor-pointer"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 <span>{isEs ? 'Deshacer' : 'Undo'}</span>
@@ -152,7 +174,7 @@ export const MeasureHud: React.FC = () => {
                 type="button"
                 disabled={digitizeSession.points.length === 0}
                 onClick={clearDigitizeSession}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-current/25 disabled:opacity-40 cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-current/25 disabled:opacity-40 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isEs ? 'Limpiar' : 'Clear'}</span>
@@ -169,12 +191,64 @@ export const MeasureHud: React.FC = () => {
                   )
                 }
                 onClick={completeDigitizing}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs rounded bg-[#0079C1] text-white disabled:opacity-40 cursor-pointer"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-[#0079C1] text-white disabled:opacity-40 cursor-pointer font-semibold"
               >
                 <Check className="w-3.5 h-3.5" />
-                <span>{isEs ? 'Guardar Entidad' : 'Save Feature'}</span>
+                <span>{isEs ? 'Guardar' : 'Save'}</span>
               </button>
             </div>
+          </>
+        )}
+
+        {isDeleting && (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-[#D32F2F]">
+                {isEs ? 'Borrar Entidad (Editor)' : 'Delete Feature (Editor)'}
+              </span>
+              <button
+                type="button"
+                title={isEs ? 'Salir' : 'Exit'}
+                onClick={() => setTool(MapToolMode.PAN)}
+                className="p-1 rounded hover:bg-black/10 cursor-pointer opacity-70 hover:opacity-100"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {pendingDeleteCandidate ? (
+              <>
+                <div className="text-xs leading-snug">
+                  {isEs ? '¿Eliminar' : 'Delete'}{' '}
+                  <span className="font-bold">"{pendingDeleteCandidate.label}"</span>{' '}
+                  {isEs ? 'de la capa' : 'from layer'}{' '}
+                  <span className="font-semibold">{pendingDeleteCandidate.layerName}</span>?
+                </div>
+                <div className="flex items-center gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={cancelPendingDelete}
+                    className="flex-1 px-3 py-1.5 text-xs rounded border border-current/25 cursor-pointer"
+                  >
+                    {isEs ? 'Cancelar' : 'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmPendingDelete}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs rounded bg-[#D32F2F] text-white font-bold cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{isEs ? 'Eliminar' : 'Delete'}</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-[11px] opacity-75">
+                {isEs
+                  ? 'Toca cualquier entidad visible en el mapa para eliminarla.'
+                  : 'Tap any visible feature on the map to delete it.'}
+              </div>
+            )}
           </>
         )}
       </div>

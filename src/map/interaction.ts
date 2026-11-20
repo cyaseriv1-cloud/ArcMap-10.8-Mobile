@@ -10,6 +10,30 @@ export enum MapToolMode {
   DIGITIZE_POINT = 'DIGITIZE_POINT',
   DIGITIZE_LINE = 'DIGITIZE_LINE',
   DIGITIZE_POLYGON = 'DIGITIZE_POLYGON',
+  DELETE_FEATURE = 'DELETE_FEATURE',
+}
+
+export function getToolDisplayName(tool: MapToolMode, isEs: boolean): string {
+  switch (tool) {
+    case MapToolMode.PAN:
+      return isEs ? 'Mover Mapa (Pan)' : 'Pan Map';
+    case MapToolMode.IDENTIFY:
+      return isEs ? 'Identificar Entidad' : 'Identify Feature';
+    case MapToolMode.SELECT:
+      return isEs ? 'Seleccionar Entidades' : 'Select Features';
+    case MapToolMode.MEASURE_DISTANCE:
+      return isEs ? 'Medir Distancia' : 'Measure Distance';
+    case MapToolMode.MEASURE_AREA:
+      return isEs ? 'Medir Área' : 'Measure Area';
+    case MapToolMode.DIGITIZE_POINT:
+      return isEs ? 'Digitalizar Punto' : 'Digitize Point';
+    case MapToolMode.DIGITIZE_LINE:
+      return isEs ? 'Digitalizar Línea' : 'Digitize Line';
+    case MapToolMode.DIGITIZE_POLYGON:
+      return isEs ? 'Digitalizar Polígono' : 'Digitize Polygon';
+    case MapToolMode.DELETE_FEATURE:
+      return isEs ? 'Borrar Entidad al Tocar' : 'Delete Feature on Tap';
+  }
 }
 
 export class MeasureSession {
