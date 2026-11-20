@@ -32,7 +32,32 @@ enum class ArcMapViewMode {
     LAYOUT_VIEW
 }
 
+enum class ArcMapTheme {
+    LIGHT,
+    DARK
+}
+
+enum class AppLanguage {
+    ES,
+    EN
+}
+
 class MainViewModel : ViewModel() {
+
+    private val _theme = MutableStateFlow(ArcMapTheme.LIGHT)
+    val theme: StateFlow<ArcMapTheme> = _theme.asStateFlow()
+
+    private val _language = MutableStateFlow(AppLanguage.ES)
+    val language: StateFlow<AppLanguage> = _language.asStateFlow()
+
+    private val _gpsLocation = MutableStateFlow<Point?>(null)
+    val gpsLocation: StateFlow<Point?> = _gpsLocation.asStateFlow()
+
+    private val _gpsAccuracy = MutableStateFlow<Float?>(null)
+    val gpsAccuracy: StateFlow<Float?> = _gpsAccuracy.asStateFlow()
+
+    private val _isSearchVisible = MutableStateFlow(false)
+    val isSearchVisible: StateFlow<Boolean> = _isSearchVisible.asStateFlow()
 
     private val _project = MutableStateFlow(MapProject("ArcMap Document (Untitled.mxd)"))
     val project: StateFlow<MapProject> = _project.asStateFlow()
@@ -370,6 +395,79 @@ class MainViewModel : ViewModel() {
 
     fun dismissIdentify() {
         _identifiedFeature.value = null
+    }
+
+    fun toggleTheme() {
+        _theme.value = if (_theme.value == ArcMapTheme.LIGHT) ArcMapTheme.DARK else ArcMapTheme.LIGHT
+        _statusMessage.value = if (_theme.value == ArcMapTheme.DARK) "Tema Oscuro activado" else "Tema Claro activado"
+        updateRender()
+    }
+
+    fun toggleLanguage() {
+        _language.value = if (_language.value == AppLanguage.ES) AppLanguage.EN else AppLanguage.ES
+        _statusMessage.value = if (_language.value == AppLanguage.ES) "Idioma: Español" else "Language: English"
+    }
+
+    fun toggleSearch(visible: Boolean) {
+        _isSearchVisible.value = visible
+    }
+
+    fun updateGpsLocation(lon: Double, lat: Double, accuracy: Float?) {
+        _gpsLocation.value = Point(lon, lat)
+        _gpsAccuracy.value = accuracy
+        updateCoordinates(lon, lat)
+        updateRender()
+    }
+
+    fun centerOnGps() {
+        val gps = _gpsLocation.value
+        if (gps != null) {
+            viewport.centerLon = gps.x
+            viewport.centerLat = gps.y
+            viewport.zoom = 16.0 // Escala de calle
+            updateCoordinates(viewport.centerLon, viewport.centerLat)
+            _statusMessage.value = "GPS: Centrado en tu ubicación actual"
+            updateRender()
+        } else {
+            // Si el GPS aún no tiene fijación satelital, centramos en la zona activa de Cusco
+            viewport.centerLon = -71.9470
+            viewport.centerLat = -13.5385
+            viewport.zoom = 15.5
+            updateCoordinates(viewport.centerLon, viewport.centerLat)
+            _statusMessage.value = "Buscando satélites GPS... (centrado en zona urbana)"
+            updateRender()
+        }
+    }
+
+    fun searchPlaces(query: String): List<Pair<VectorLayer, Feature>> {
+        if (query.isBlank()) return emptyList()
+        val results = mutableListOf<Pair<VectorLayer, Feature>>()
+        val clean = query.trim().lowercase()
+
+        for (layer in _layers.value) {
+            if (!layer.isVisible) continue
+            for (feat in layer.features) {
+                val matches = feat.attributes.values.any { it?.toString()?.lowercase()?.contains(clean) == true }
+                if (matches) {
+                    results.add(Pair(layer, feat))
+                }
+            }
+        }
+        return results
+    }
+
+    fun zoomToFeature(feature: Feature) {
+        val geom = feature.geometry ?: return
+        if (geom is Point) {
+            viewport.centerLon = geom.x
+            viewport.centerLat = geom.y
+            viewport.zoom = 16.5
+        } else {
+            viewport.zoomToExtent(geom.boundingBox)
+        }
+        updateCoordinates(viewport.centerLon, viewport.centerLat)
+        updateRender()
+        _statusMessage.value = "Navegado a: ${feature.getString("NOMBRE") ?: "Entidad ${feature.id}"}"
     }
 
     fun setViewMode(mode: ArcMapViewMode) {

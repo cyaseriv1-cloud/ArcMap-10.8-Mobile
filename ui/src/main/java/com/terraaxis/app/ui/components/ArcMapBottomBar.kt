@@ -34,10 +34,17 @@ fun ArcMapBottomBar(
     val cursorUtm by viewModel.cursorUtm.collectAsState()
     val mapScale by viewModel.mapScale.collectAsState()
     val viewMode by viewModel.viewMode.collectAsState()
+    val theme by viewModel.theme.collectAsState()
+    val isDark = theme == com.terraaxis.app.viewmodel.ArcMapTheme.DARK
+
+    val barBg = if (isDark) Color(0xFF161B22) else Color(0xFFEBE9E4)
+    val borderCol = if (isDark) Color(0xFF30363D) else Color(0xFFB0B0B0)
+    val textColor = if (isDark) Color(0xFFE6EDF3) else Color.Black
+    val switchBg = if (isDark) Color(0xFF21262D) else Color(0xFFD6D4CF)
 
     Surface(
-        color = Color(0xFFEBE9E4), // Fondo gris clásico de ArcGIS Desktop
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFB0B0B0)),
+        color = barBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderCol),
         shadowElevation = 4.dp
     ) {
         Row(
@@ -49,8 +56,8 @@ fun ArcMapBottomBar(
             // ── CONMUTADOR DE VISTAS CLÁSICO DE ARCMAP (Data View / Layout View) ──
             Row(
                 modifier = Modifier
-                    .background(Color(0xFFD6D4CF), RoundedCornerShape(2.dp))
-                    .border(1.dp, Color(0xFFA0A0A0), RoundedCornerShape(2.dp))
+                    .background(switchBg, RoundedCornerShape(2.dp))
+                    .border(1.dp, borderCol, RoundedCornerShape(2.dp))
                     .padding(1.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -59,7 +66,7 @@ fun ArcMapBottomBar(
                     modifier = Modifier
                         .size(24.dp)
                         .background(
-                            if (viewMode == ArcMapViewMode.DATA_VIEW) Color(0xFFFFFFFF) else Color.Transparent,
+                            if (viewMode == ArcMapViewMode.DATA_VIEW) (if (isDark) Color(0xFF1E3A5F) else Color.White) else Color.Transparent,
                             RoundedCornerShape(2.dp)
                         )
                         .border(
@@ -83,7 +90,7 @@ fun ArcMapBottomBar(
                     modifier = Modifier
                         .size(24.dp)
                         .background(
-                            if (viewMode == ArcMapViewMode.LAYOUT_VIEW) Color(0xFFFFFFFF) else Color.Transparent,
+                            if (viewMode == ArcMapViewMode.LAYOUT_VIEW) (if (isDark) Color(0xFF1E3A5F) else Color.White) else Color.Transparent,
                             RoundedCornerShape(2.dp)
                         )
                         .border(
@@ -112,7 +119,7 @@ fun ArcMapBottomBar(
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = "Refresh",
-                        tint = Color.DarkGray,
+                        tint = if (isDark) Color.LightGray else Color.DarkGray,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -133,7 +140,7 @@ fun ArcMapBottomBar(
                     text = statusMsg ?: "Listo",
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
-                    color = Color.Black,
+                    color = textColor,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1
                 )
@@ -152,7 +159,7 @@ fun ArcMapBottomBar(
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFF004D40)
+                    color = if (isDark) Color(0xFF4DD0E1) else Color(0xFF004D40)
                 )
 
                 Text("|", color = Color.Gray, fontSize = 11.sp)
@@ -163,7 +170,7 @@ fun ArcMapBottomBar(
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFF1A237E)
+                    color = if (isDark) Color(0xFF90CAF9) else Color(0xFF1A237E)
                 )
 
                 Text("|", color = Color.Gray, fontSize = 11.sp)
@@ -174,7 +181,7 @@ fun ArcMapBottomBar(
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = textColor
                 )
             }
         }

@@ -1,6 +1,15 @@
 package com.terraaxis.app.ui
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Bundle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
@@ -8,35 +17,73 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.terraaxis.app.ui.components.*
+import com.terraaxis.app.viewmodel.ArcMapTheme
 import com.terraaxis.app.viewmodel.ArcMapViewMode
 import com.terraaxis.app.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 /**
- * Pantalla principal auténtica de ArcMap 10.8 (ArcGIS Desktop Mobile).
+ * Pantalla principal de ArcMap 10.8 (ArcGIS Desktop Mobile):
+ * - Soporte de GPS en tiempo real con punto azul pulsante
+ * - Tema Claro / Tema Oscuro
+ * - Soporte Bilingüe Español / Inglés
+ * - Buscador / Geocodificador Find
+ * - Data View y Layout View
  */
 @Composable
 fun ArcMapScreen(
     viewModel: MainViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     val isTableVisible by viewModel.isAttributeTableVisible.collectAsState()
     val isToolboxVisible by viewModel.isToolboxVisible.collectAsState()
     val isCatalogVisible by viewModel.isCatalogVisible.collectAsState()
+    val isSearchVisible by viewModel.isSearchVisible.collectAsState()
     val tableLayer by viewModel.selectedLayerForTable.collectAsState()
     val identified by viewModel.identifiedFeature.collectAsState()
     val activeTool by viewModel.activeTool.collectAsState()
     val viewMode by viewModel.viewMode.collectAsState()
+    val theme by viewModel.theme.collectAsState()
 
-    BackHandler(enabled = drawerState.isOpen || identified != null || isTableVisible || isToolboxVisible || isCatalogVisible || activeTool != com.terraaxis.map.interaction.MapToolMode.PAN || viewMode != ArcMapViewMode.DATA_VIEW) {
+    val locationManager = remember {
+        context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+    }
+
+    // Launcher para permisos de ubicación en tiempo de ejecución
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        val fineGranted = perms[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = perms[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fineGranted || coarseGranted) {
+            startLocationUpdates(context, locationManager, viewModel)
+            viewModel.centerOnGps()
+        }
+    }
+
+    // Al iniciar, intentar obtener la última ubicación conocida
+    LaunchedEffect(Unit) {
+        val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasFine || hasCoarse) {
+            startLocationUpdates(context, locationManager, viewModel)
+        }
+    }
+
+    BackHandler(enabled = drawerState.isOpen || identified != null || isTableVisible || isToolboxVisible || isCatalogVisible || isSearchVisible || activeTool != com.terraaxis.map.interaction.MapToolMode.PAN || viewMode != ArcMapViewMode.DATA_VIEW) {
         when {
             drawerState.isOpen -> scope.launch { drawerState.close() }
             identified != null -> viewModel.dismissIdentify()
+            isSearchVisible -> viewModel.toggleSearch(false)
             isCatalogVisible -> viewModel.toggleCatalog(false)
             isTableVisible -> viewModel.closeAttributeTable()
             isToolboxVisible -> viewModel.toggleToolbox(false)
@@ -75,7 +122,6 @@ fun ArcMapScreen(
             ) {
                 // Alternar entre DATA VIEW (Mapa) y LAYOUT VIEW (Lámina)
                 if (viewMode == ArcMapViewMode.DATA_VIEW) {
-                    // Vista geográfica interactiva
                     MapCanvasView(
                         viewModel = viewModel,
                         modifier = Modifier.fillMaxSize()
@@ -87,20 +133,32 @@ fun ArcMapScreen(
                         modifier = Modifier.align(Alignment.BottomCenter)
                     )
 
-                    // Botón flotante para centrar mapa en el dataset
+                    // Botón flotante GPS / Mi Ubicación real
                     FloatingActionButton(
                         onClick = {
-                            viewModel.zoomFullExtent()
+                            val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                            val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                            if (hasFine || hasCoarse) {
+                                startLocationUpdates(context, locationManager, viewModel)
+                                viewModel.centerOnGps()
+                            } else {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }
                         },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(16.dp),
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = if (theme == ArcMapTheme.DARK) Color(0xFF1E3A5F) else Color(0xFFE8EEF5),
+                        contentColor = Color(0xFF0079C1)
                     ) {
-                        Icon(Icons.Default.MyLocation, contentDescription = "Encuadrar Capas")
+                        Icon(Icons.Default.MyLocation, contentDescription = "Mi Ubicación GPS")
                     }
                 } else {
-                    // Vista de Lámina de Impresión (Layout View)
                     ArcMapLayoutView(
                         viewModel = viewModel,
                         modifier = Modifier.fillMaxSize()
@@ -110,7 +168,14 @@ fun ArcMapScreen(
         }
     }
 
-    // Ventanas modales y diálogos de ArcGIS Desktop 10.8
+    // ── Ventanas modales y diálogos ───────────────────────────────────────────
+    if (isSearchVisible) {
+        ArcMapSearchDialog(
+            viewModel = viewModel,
+            onDismiss = { viewModel.toggleSearch(false) }
+        )
+    }
+
     if (isCatalogVisible) {
         ArcCatalogDialog(
             viewModel = viewModel,
@@ -140,5 +205,44 @@ fun ArcMapScreen(
             viewModel = viewModel,
             onDismiss = { viewModel.dismissIdentify() }
         )
+    }
+}
+
+private fun startLocationUpdates(
+    context: Context,
+    lm: LocationManager?,
+    viewModel: MainViewModel
+) {
+    if (lm == null) return
+    try {
+        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        var bestLoc: Location? = null
+        for (p in providers) {
+            val loc = lm.getLastKnownLocation(p)
+            if (loc != null && (bestLoc == null || loc.accuracy < bestLoc.accuracy)) {
+                bestLoc = loc
+            }
+        }
+        if (bestLoc != null) {
+            viewModel.updateGpsLocation(bestLoc.longitude, bestLoc.latitude, bestLoc.accuracy)
+        }
+
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                viewModel.updateGpsLocation(location.longitude, location.latitude, location.accuracy)
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+        }
+
+        if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000L, 3f, listener)
+        } else if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+            lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 3f, listener)
+        }
+    } catch (e: SecurityException) {
+        e.printStackTrace()
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }

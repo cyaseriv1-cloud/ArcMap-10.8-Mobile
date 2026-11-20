@@ -24,6 +24,9 @@ fun MapCanvasView(
     val measureSession by viewModel.measureSession.collectAsState()
     val digitizeSession by viewModel.digitizeSession.collectAsState()
     val renderTrigger by viewModel.mapRenderTrigger.collectAsState()
+    val theme by viewModel.theme.collectAsState()
+    val gpsLocation by viewModel.gpsLocation.collectAsState()
+    val gpsAccuracy by viewModel.gpsAccuracy.collectAsState()
 
     Canvas(
         modifier = modifier
@@ -67,7 +70,10 @@ fun MapCanvasView(
                 viewport = viewModel.viewport,
                 layers = layers,
                 measureSession = if (activeTool == MapToolMode.MEASURE_DISTANCE || activeTool == MapToolMode.MEASURE_AREA) measureSession else null,
-                digitizeSession = if (activeTool == MapToolMode.DIGITIZE_LINE || activeTool == MapToolMode.DIGITIZE_POLYGON) digitizeSession else null
+                digitizeSession = if (activeTool == MapToolMode.DIGITIZE_LINE || activeTool == MapToolMode.DIGITIZE_POLYGON) digitizeSession else null,
+                isDarkMode = theme == com.terraaxis.app.viewmodel.ArcMapTheme.DARK,
+                gpsLocation = gpsLocation,
+                gpsAccuracy = gpsAccuracy
             )
         }
     }

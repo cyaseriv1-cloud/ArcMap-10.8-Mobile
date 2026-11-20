@@ -115,6 +115,28 @@ class MapCanvasRenderer {
         typeface = Typeface.DEFAULT_BOLD
     }
 
+    // GPS Location Paints
+    private val gpsHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.argb(45, 0, 121, 193)
+    }
+
+    private val gpsHaloStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.argb(120, 0, 121, 193)
+        strokeWidth = 2f
+    }
+
+    private val gpsDotWhiteBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.WHITE
+    }
+
+    private val gpsDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.rgb(0, 121, 193) // ESRI Blue
+    }
+
     private val path = Path()
 
     fun render(
@@ -122,10 +144,33 @@ class MapCanvasRenderer {
         viewport: MapViewport,
         layers: List<VectorLayer>,
         measureSession: MeasureSession? = null,
-        digitizeSession: DigitizeSession? = null
+        digitizeSession: DigitizeSession? = null,
+        isDarkMode: Boolean = false,
+        gpsLocation: Point? = null,
+        gpsAccuracy: Float? = null
     ) {
-        // 1. Draw GIS Map Paper background
-        canvas.drawColor(Color.rgb(246, 247, 248))
+        // Adapt theme colors
+        if (isDarkMode) {
+            canvas.drawColor(Color.rgb(22, 26, 33)) // Dark slate
+            gridPaint.color = Color.argb(35, 255, 255, 255)
+            gridTextPaint.color = Color.rgb(160, 175, 190)
+            scaleBarPaint.color = Color.rgb(230, 230, 230)
+            scaleBarWhitePaint.color = Color.rgb(40, 48, 60)
+            scaleBarStrokePaint.color = Color.rgb(230, 230, 230)
+            scaleBarTextPaint.color = Color.rgb(230, 230, 230)
+            textHaloPaint.color = Color.rgb(22, 26, 33)
+            textPaint.color = Color.rgb(240, 240, 240)
+        } else {
+            canvas.drawColor(Color.rgb(246, 247, 248)) // Light paper
+            gridPaint.color = Color.argb(45, 0, 0, 0)
+            gridTextPaint.color = Color.rgb(100, 100, 100)
+            scaleBarPaint.color = Color.BLACK
+            scaleBarWhitePaint.color = Color.WHITE
+            scaleBarStrokePaint.color = Color.BLACK
+            scaleBarTextPaint.color = Color.BLACK
+            textHaloPaint.color = Color.WHITE
+            textPaint.color = Color.rgb(20, 20, 20)
+        }
 
         // 2. Draw Cartographic Coordinate Grid (Graticule)
         drawGraticule(canvas, viewport)
@@ -137,15 +182,43 @@ class MapCanvasRenderer {
             drawLayer(canvas, viewport, layer)
         }
 
-        // 4. Draw Active Measure Session
+        // 4. Draw GPS Location Indicator (Google Maps / ArcMap Collector Blue Dot)
+        gpsLocation?.let { drawGpsLocation(canvas, viewport, it, gpsAccuracy) }
+
+        // 5. Draw Active Measure Session
         measureSession?.let { drawMeasureOverlay(canvas, viewport, it) }
 
-        // 5. Draw Active Digitize Session
+        // 6. Draw Active Digitize Session
         digitizeSession?.let { drawDigitizeOverlay(canvas, viewport, it) }
 
-        // 6. Draw Cartographic Scale Bar & North Arrow
+        // 7. Draw Cartographic Scale Bar & North Arrow
         drawScaleBar(canvas, viewport)
         drawNorthArrow(canvas, viewport)
+    }
+
+    private fun drawGpsLocation(canvas: Canvas, viewport: MapViewport, loc: Point, accuracy: Float?) {
+        val (sx, sy) = viewport.geoToScreen(loc.x, loc.y)
+        if (sx < -200 || sx > viewport.screenWidth + 200 || sy < -200 || sy > viewport.screenHeight + 200) return
+
+        // 1. Halo de precisión en metros convertido a píxeles
+        val mpp = viewport.metersPerPixel
+        val radiusPx = if (accuracy != null && accuracy > 0f && mpp > 0.0) {
+            (accuracy / mpp).toFloat().coerceIn(16f, 300f)
+        } else {
+            36f
+        }
+
+        canvas.drawCircle(sx, sy, radiusPx, gpsHaloPaint)
+        canvas.drawCircle(sx, sy, radiusPx, gpsHaloStrokePaint)
+
+        // 2. Círculo exterior blanco
+        canvas.drawCircle(sx, sy, 14f, gpsDotWhiteBorder)
+
+        // 3. Punto azul interior brillante
+        canvas.drawCircle(sx, sy, 10f, gpsDotPaint)
+
+        // 4. Centro blanco
+        canvas.drawCircle(sx, sy, 3f, gpsDotWhiteBorder)
     }
 
     private fun drawGraticule(canvas: Canvas, viewport: MapViewport) {
