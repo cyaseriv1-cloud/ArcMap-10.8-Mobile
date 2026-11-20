@@ -69,9 +69,12 @@ export const ArcMapLayoutView: React.FC = () => {
   }, [updateRender]);
 
   const saveDataUrlAsPng = (dataUrl: string, filename: string) => {
-    if (window.AndroidBridge?.saveBase64File) {
+    const saveAndroid =
+      window.AndroidBridge?.saveBase64FileWithPicker ??
+      window.AndroidBridge?.saveBase64File;
+    if (saveAndroid) {
       const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-      window.AndroidBridge.saveBase64File(filename, 'image/png', base64);
+      saveAndroid(filename, 'image/png', base64);
       return;
     }
     const a = document.createElement('a');

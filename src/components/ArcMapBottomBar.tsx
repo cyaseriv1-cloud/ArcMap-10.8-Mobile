@@ -26,6 +26,8 @@ export const ArcMapBottomBar: React.FC = () => {
   const lonDir = lon >= 0 ? 'E' : 'W';
   const latDir = lat >= 0 ? 'N' : 'S';
   const coordText = `${Math.abs(lon).toFixed(4)}°${lonDir} ${Math.abs(lat).toFixed(4)}°${latDir}`;
+  const appVersion =
+    (typeof window !== 'undefined' && window.AndroidBridge?.getAppVersion?.()) || '1.2.0';
 
   return (
     <footer
@@ -77,7 +79,7 @@ export const ArcMapBottomBar: React.FC = () => {
         </button>
       </div>
 
-      {/* Responsive Status + WGS84 + UTM + Scale (prevents UTM/scale from clipping off mobile screens) */}
+      {/* Responsive Status + WGS84 + UTM + Scale */}
       <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 leading-tight">
         <div className="flex items-center justify-between gap-2 min-w-0 sm:flex-1">
           <span className={`font-medium truncate ${textColor}`}>
@@ -113,6 +115,12 @@ export const ArcMapBottomBar: React.FC = () => {
 
           <span className={`hidden sm:inline font-bold font-mono tabular-nums ${textColor}`}>
             1: {mapScale.toLocaleString('en-US')}
+          </span>
+
+          <span className="text-gray-400">|</span>
+
+          <span className={`font-mono tabular-nums opacity-70 ${textColor}`}>
+            v{appVersion}
           </span>
         </div>
       </div>

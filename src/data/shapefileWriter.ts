@@ -90,16 +90,22 @@ export const ShapefileWriter = {
     return { shp, shx, dbf, prj };
   },
 
-  buildZipBlob(layer: VectorLayer, baseName: string): Blob {
+  buildZipBytes(layer: VectorLayer, baseName: string): Uint8Array {
     const bundle = ShapefileWriter.buildFiles(layer);
     const safeName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_') || 'layer';
-    const zipBytes = createUncompressedZip([
+    return createUncompressedZip([
       { name: `${safeName}.shp`, data: bundle.shp },
       { name: `${safeName}.shx`, data: bundle.shx },
       { name: `${safeName}.dbf`, data: bundle.dbf },
       { name: `${safeName}.prj`, data: bundle.prj },
     ]);
-    return new Blob([zipBytes.buffer as ArrayBuffer], { type: 'application/zip' });
+  },
+
+  buildZipBlob(layer: VectorLayer, baseName: string): Blob {
+    const zipBytes = ShapefileWriter.buildZipBytes(layer, baseName);
+    const copy = new ArrayBuffer(zipBytes.byteLength);
+    new Uint8Array(copy).set(zipBytes);
+    return new Blob([copy], { type: 'application/zip' });
   },
 };
 

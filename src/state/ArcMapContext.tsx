@@ -69,6 +69,17 @@ export enum AppLanguage {
   EN = 'EN',
 }
 
+export enum ExportFileFormat {
+  SHP_ZIP = 'SHP_ZIP',
+  GEOJSON = 'GEOJSON',
+}
+
+export interface ExportDialogState {
+  isOpen: boolean;
+  layerId: string | null;
+  format: ExportFileFormat;
+}
+
 export interface WorldPlaceResult {
   displayName: string;
   lat: number;
@@ -243,6 +254,15 @@ interface ArcMapContextValue {
     shpBuffer: ArrayBuffer,
     dbfBuffer?: ArrayBuffer | null
   ) => boolean;
+  exportDialogState: ExportDialogState;
+  openExportDialog: (layer?: VectorLayer | null, format?: ExportFileFormat) => void;
+  closeExportDialog: () => void;
+  executeLayerExport: (params: {
+    layer: VectorLayer;
+    format: ExportFileFormat;
+    filename: string;
+    mode: 'picker' | 'downloads';
+  }) => boolean;
   exportActiveLayerAsGeoJson: () => void;
   exportLayerAsShapefile: (layer: VectorLayer) => Promise<void>;
 }
@@ -308,6 +328,11 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     'Listo · Selecciona un Mapa Base para comenzar'
   );
   const [renderVersion, setRenderVersion] = useState(0);
+  const [exportDialogState, setExportDialogState] = useState<ExportDialogState>({
+    isOpen: false,
+    layerId: null,
+    format: ExportFileFormat.SHP_ZIP,
+  });
 
   const updateRender = useCallback(() => {
     setRenderVersion((v) => v + 1);
@@ -317,8 +342,12 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     tileManagerRef.current.onTileLoaded = () => {
       setRenderVersion((v) => v + 1);
     };
+    window.__onAndroidExportStatus = (_status: string, message: string) => {
+      setStatusMessage(message);
+    };
     return () => {
       tileManagerRef.current.onTileLoaded = null;
+      delete window.__onAndroidExportStatus;
       if (gpsWatchIdRef.current !== null && 'geolocation' in navigator) {
         navigator.geolocation.clearWatch(gpsWatchIdRef.current);
         gpsWatchIdRef.current = null;
@@ -1637,38 +1666,122 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [addLayer, updateCoordinates, updateRender]
   );
 
-  const exportActiveLayerAsGeoJson = useCallback(() => {
-    if (!activeLayer) {
-      setStatusMessage('Sin capa activa para exportar.');
-      return;
-    }
-    const geoJson = GeoJsonParser.exportToGeoJson(activeLayer);
-    const safeName = activeLayer.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'layer';
-    triggerDownload(
-      new Blob([geoJson], { type: 'application/geo+json' }),
-      `${safeName}.geojson`
-    );
-    setStatusMessage(
-      `✓ Exportado: ${safeName}.geojson (${activeLayer.features.length} entidades)`
-    );
-  }, [activeLayer]);
+  const openExportDialog = useCallback(
+    (layer?: VectorLayer | null, format: ExportFileFormat = ExportFileFormat.SHP_ZIP) => {
+      const targetId = layer?.id ?? activeLayer?.id ?? layers[0]?.id ?? null;
+      setExportDialogState({
+        isOpen: true,
+        layerId: targetId,
+        format,
+      });
+    },
+    [activeLayer?.id, layers]
+  );
 
-  const exportLayerAsShapefile = useCallback(async (layer: VectorLayer) => {
-    try {
-      setStatusMessage(`Exportando Shapefile '${layer.name}'...`);
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      const safeName = layer.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'layer';
-      const zipBlob = ShapefileWriter.buildZipBlob(layer, safeName);
-      triggerDownload(zipBlob, `${safeName}_shapefile.zip`);
-      setStatusMessage(
-        `✓ Shapefile exportado: ${safeName}_shapefile.zip (.shp, .shx, .dbf, .prj)`
-      );
-    } catch (err) {
-      setStatusMessage(
-        `Error al exportar Shapefile: ${err instanceof Error ? err.message : 'Desconocido'}`
-      );
-    }
+  const closeExportDialog = useCallback(() => {
+    setExportDialogState((prev) => ({ ...prev, isOpen: false }));
   }, []);
+
+  const executeLayerExport = useCallback(
+    ({
+      layer,
+      format,
+      filename,
+      mode,
+    }: {
+      layer: VectorLayer;
+      format: ExportFileFormat;
+      filename: string;
+      mode: 'picker' | 'downloads';
+    }): boolean => {
+      try {
+        const expectedExt = format === ExportFileFormat.SHP_ZIP ? '.zip' : '.geojson';
+        const rawTrimmed = filename.trim().replace(/[\\/:*?"<>|]/g, '_');
+        const strippedStem =
+          rawTrimmed.replace(/\.(zip|geojson|json)$/i, '').trim() ||
+          layer.name.replace(/[^a-zA-Z0-9_-]/g, '_') ||
+          'capa_export';
+        const finalName = `${strippedStem}${expectedExt}`;
+
+        if (format === ExportFileFormat.SHP_ZIP) {
+          const zipBytes = ShapefileWriter.buildZipBytes(layer, strippedStem);
+          const mimeType = 'application/zip';
+
+          if (window.AndroidBridge) {
+            const base64 = uint8ArrayToBase64(zipBytes);
+            if (!base64) {
+              setStatusMessage(
+                language === AppLanguage.ES
+                  ? 'Error: no se pudo codificar el archivo Shapefile.'
+                  : 'Error: failed to encode Shapefile bytes.'
+              );
+              return false;
+            }
+            if (mode === 'downloads' && window.AndroidBridge.saveBase64FileToDownloads) {
+              window.AndroidBridge.saveBase64FileToDownloads(finalName, mimeType, base64);
+            } else {
+              const saveWithPicker =
+                window.AndroidBridge.saveBase64FileWithPicker ??
+                window.AndroidBridge.saveBase64File;
+              saveWithPicker(finalName, mimeType, base64);
+            }
+          } else {
+            const copy = new ArrayBuffer(zipBytes.byteLength);
+            new Uint8Array(copy).set(zipBytes);
+            triggerBrowserDownload(new Blob([copy], { type: mimeType }), finalName);
+            setStatusMessage(
+              language === AppLanguage.ES
+                ? `✓ Shapefile exportado: ${finalName} (.shp, .shx, .dbf, .prj)`
+                : `✓ Shapefile exported: ${finalName} (.shp, .shx, .dbf, .prj)`
+            );
+          }
+        } else {
+          const geoJson = GeoJsonParser.exportToGeoJson(layer);
+          const androidMime = 'application/json';
+          const webMime = 'application/geo+json';
+
+          if (window.AndroidBridge) {
+            const base64 = textToBase64Utf8(geoJson);
+            if (mode === 'downloads' && window.AndroidBridge.saveBase64FileToDownloads) {
+              window.AndroidBridge.saveBase64FileToDownloads(finalName, androidMime, base64);
+            } else {
+              const saveWithPicker =
+                window.AndroidBridge.saveBase64FileWithPicker ??
+                window.AndroidBridge.saveBase64File;
+              saveWithPicker(finalName, androidMime, base64);
+            }
+          } else {
+            triggerBrowserDownload(new Blob([geoJson], { type: webMime }), finalName);
+            setStatusMessage(
+              language === AppLanguage.ES
+                ? `✓ Exportado: ${finalName} (${layer.features.length} entidades)`
+                : `✓ Exported: ${finalName} (${layer.features.length} features)`
+            );
+          }
+        }
+
+        setExportDialogState((prev) => ({ ...prev, isOpen: false }));
+        return true;
+      } catch (err) {
+        setStatusMessage(
+          `Error al exportar: ${err instanceof Error ? err.message : 'Desconocido'}`
+        );
+        return false;
+      }
+    },
+    [language]
+  );
+
+  const exportActiveLayerAsGeoJson = useCallback(() => {
+    openExportDialog(activeLayer, ExportFileFormat.GEOJSON);
+  }, [activeLayer, openExportDialog]);
+
+  const exportLayerAsShapefile = useCallback(
+    async (layer: VectorLayer) => {
+      openExportDialog(layer, ExportFileFormat.SHP_ZIP);
+    },
+    [openExportDialog]
+  );
 
   const value: ArcMapContextValue = {
     theme,
@@ -1777,6 +1890,10 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setLayerLabelField,
     loadGeoJsonText,
     loadShapefileBuffers,
+    exportDialogState,
+    openExportDialog,
+    closeExportDialog,
+    executeLayerExport,
     exportActiveLayerAsGeoJson,
     exportLayerAsShapefile,
   };
@@ -1794,29 +1911,31 @@ declare global {
   interface Window {
     AndroidBridge?: {
       saveBase64File: (filename: string, mimeType: string, base64Data: string) => void;
+      saveBase64FileWithPicker?: (filename: string, mimeType: string, base64Data: string) => void;
+      saveBase64FileToDownloads?: (filename: string, mimeType: string, base64Data: string) => void;
+      getAppVersion?: () => string;
     };
     __arcmapHandleBack?: () => boolean;
+    __onAndroidExportStatus?: (status: string, message: string) => void;
   }
 }
 
-function triggerDownload(blob: Blob, filename: string): void {
-  if (window.AndroidBridge?.saveBase64File) {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      const base64 = result.includes(',') ? result.split(',')[1] : result;
-      if (base64) {
-        window.AndroidBridge?.saveBase64File(
-          filename,
-          blob.type || 'application/octet-stream',
-          base64
-        );
-      }
-    };
-    reader.readAsDataURL(blob);
-    return;
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const chunkSize = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
   }
+  return btoa(binary);
+}
 
+function textToBase64Utf8(text: string): string {
+  const encoded = new TextEncoder().encode(text);
+  return uint8ArrayToBase64(encoded);
+}
+
+function triggerBrowserDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

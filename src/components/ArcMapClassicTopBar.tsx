@@ -33,7 +33,13 @@ import {
   Filter,
 } from 'lucide-react';
 import { MapToolMode } from '../map/interaction';
-import { AppLanguage, ArcMapTheme, ArcMapViewMode, useArcMap } from '../state/ArcMapContext';
+import {
+  AppLanguage,
+  ArcMapTheme,
+  ArcMapViewMode,
+  ExportFileFormat,
+  useArcMap,
+} from '../state/ArcMapContext';
 
 type MenuKey = 'file' | 'edit' | 'view' | 'selection' | 'geoprocessing' | 'windows' | null;
 
@@ -41,12 +47,12 @@ export const ArcMapClassicTopBar: React.FC = () => {
   const {
     activeTool,
     activeLayer,
+    layers,
     isEditorActive,
     viewMode,
     theme,
     language,
     setTool,
-    setStatusMessage,
     toggleLanguage,
     toggleTheme,
     toggleToc,
@@ -59,8 +65,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
     requestGpsAndCapture,
     loadSampleData,
     clearAllLayers,
-    exportActiveLayerAsGeoJson,
-    exportLayerAsShapefile,
+    openExportDialog,
     setViewMode,
     toggleEditor,
     clearAllSelections,
@@ -74,6 +79,8 @@ export const ArcMapClassicTopBar: React.FC = () => {
 
   const isDark = theme === ArcMapTheme.DARK;
   const isEs = language === AppLanguage.ES;
+  const appVersion =
+    (typeof window !== 'undefined' && window.AndroidBridge?.getAppVersion?.()) || '1.2.0';
 
   useEffect(() => {
     const onOutside = (e: MouseEvent | TouchEvent) => {
@@ -126,8 +133,8 @@ export const ArcMapClassicTopBar: React.FC = () => {
           <Globe className="w-4 h-4 text-white shrink-0" />
           <span className="text-white font-bold text-[13px] sm:text-xs truncate">
             {isEs
-              ? 'Sin título - ArcMap 10.8 (Esri Mobile)'
-              : 'Untitled - ArcMap 10.8 (Esri Mobile)'}
+              ? `Sin título - ArcMap 10.8 · v${appVersion}`
+              : `Untitled - ArcMap 10.8 · v${appVersion}`}
           </span>
         </div>
 
@@ -273,15 +280,10 @@ export const ArcMapClassicTopBar: React.FC = () => {
                       }
                       onClick={() => {
                         setActiveMenu(null);
-                        if (!activeLayer) {
-                          setStatusMessage(
-                            isEs
-                              ? 'Sin capa activa para exportar.'
-                              : 'No active layer to export.'
-                          );
-                          return;
-                        }
-                        void exportLayerAsShapefile(activeLayer);
+                        openExportDialog(
+                          activeLayer ?? layers[0] ?? null,
+                          ExportFileFormat.SHP_ZIP
+                        );
                       }}
                     />
                     <MenuItem
@@ -290,7 +292,10 @@ export const ArcMapClassicTopBar: React.FC = () => {
                       label={isEs ? 'Exportar capa como GeoJSON' : 'Export layer as GeoJSON'}
                       onClick={() => {
                         setActiveMenu(null);
-                        exportActiveLayerAsGeoJson();
+                        openExportDialog(
+                          activeLayer ?? layers[0] ?? null,
+                          ExportFileFormat.GEOJSON
+                        );
                       }}
                     />
                     <MenuDivider isDark={isDark} />

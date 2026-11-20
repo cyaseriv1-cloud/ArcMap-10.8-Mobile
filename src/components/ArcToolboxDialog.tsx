@@ -13,7 +13,12 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import { AppLanguage, ArcMapTheme, useArcMap } from '../state/ArcMapContext';
+import {
+  AppLanguage,
+  ArcMapTheme,
+  ExportFileFormat,
+  useArcMap,
+} from '../state/ArcMapContext';
 
 enum ToolboxTool {
   NONE = 'NONE',
@@ -33,7 +38,7 @@ export const ArcToolboxDialog: React.FC = () => {
     runClip,
     runSimplify,
     runSelectByAttributes,
-    exportLayerAsShapefile,
+    openExportDialog,
     theme,
     language,
   } = useArcMap();
@@ -86,7 +91,7 @@ export const ArcToolboxDialog: React.FC = () => {
         runSelectByAttributes(targetLayer, sqlWhereClause);
         break;
       case ToolboxTool.EXPORT_SHP:
-        void exportLayerAsShapefile(targetLayer);
+        openExportDialog(targetLayer, ExportFileFormat.SHP_ZIP);
         break;
       default:
         break;

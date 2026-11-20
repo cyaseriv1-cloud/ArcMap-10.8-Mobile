@@ -9,6 +9,7 @@ import { ArcMapTableOfContentsDrawer } from './components/ArcMapTableOfContentsD
 import { ArcToolboxDialog } from './components/ArcToolboxDialog';
 import { AttributeTableSheet } from './components/AttributeTableSheet';
 import { FeatureAttributesDialog } from './components/FeatureAttributesDialog';
+import { ExportLayerDialog } from './components/ExportLayerDialog';
 import { IdentifyBottomSheet } from './components/IdentifyBottomSheet';
 import { MapCanvasView } from './components/MapCanvasView';
 import { NewLayerDialog } from './components/NewLayerDialog';
@@ -34,6 +35,7 @@ const ArcMapWorkspace: React.FC = () => {
     isNewLayerDialogVisible,
     pendingFeatureDraft,
     pendingDeleteCandidate,
+    exportDialogState,
     activeTool,
     toggleToc,
     dismissIdentify,
@@ -45,6 +47,7 @@ const ArcMapWorkspace: React.FC = () => {
     closeNewLayerDialog,
     cancelPendingFeature,
     cancelPendingDelete,
+    closeExportDialog,
     setViewMode,
     setTool,
   } = useArcMap();
@@ -57,6 +60,10 @@ const ArcMapWorkspace: React.FC = () => {
       }
       if (pendingFeatureDraft) {
         cancelPendingFeature();
+        return true;
+      }
+      if (exportDialogState.isOpen) {
+        closeExportDialog();
         return true;
       }
       if (isNewLayerDialogVisible) {
@@ -121,8 +128,10 @@ const ArcMapWorkspace: React.FC = () => {
     cancelPendingFeature,
     closeAttributeTable,
     closeBasemapDialog,
+    closeExportDialog,
     closeNewLayerDialog,
     dismissIdentify,
+    exportDialogState.isOpen,
     identifiedFeature,
     isAttributeTableVisible,
     isBasemapDialogVisible,
@@ -174,6 +183,7 @@ const ArcMapWorkspace: React.FC = () => {
       <FeatureAttributesDialog />
       <AttributeTableSheet />
       <ArcToolboxDialog />
+      <ExportLayerDialog />
       <IdentifyBottomSheet />
     </div>
   );

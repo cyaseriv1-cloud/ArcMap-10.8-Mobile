@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.util.Base64
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
@@ -28,6 +29,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -57,15 +59,24 @@ class MainActivity : ComponentActivity() {
             val uri = result.data?.data
             if (uri != null) {
                 try {
-                    contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    val out = contentResolver.openOutputStream(uri)
+                        ?: throw IOException("No se pudo abrir flujo de escritura")
+                    out.use {
+                        it.write(bytes)
+                        it.flush()
+                    }
+                    val displayName = resolveUriDisplayName(uri) ?: name
                     Toast.makeText(
                         this@MainActivity,
-                        "Archivo guardado: $name",
+                        "Archivo guardado: $displayName",
                         Toast.LENGTH_LONG
                     ).show()
+                    notifyJsExportStatus("saved", "✓ Archivo guardado en carpeta elegida: $displayName")
                 } catch (e: Exception) {
                     saveToDownloadsFallback(name, mime, bytes, e)
                 }
+            } else {
+                saveToDownloadsFallback(name, mime, bytes)
             }
         } else {
             Toast.makeText(
@@ -73,6 +84,7 @@ class MainActivity : ComponentActivity() {
                 "Guardado cancelado",
                 Toast.LENGTH_SHORT
             ).show()
+            notifyJsExportStatus("cancelled", "Guardado cancelado")
         }
     }
 
@@ -135,11 +147,12 @@ class MainActivity : ComponentActivity() {
         settings.allowFileAccess = true
         settings.allowContentAccess = true
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+        settings.cacheMode = WebSettings.LOAD_NO_CACHE
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
         settings.userAgentString = settings.userAgentString
             .replace("; wv", "")
-            .plus(" ArcMap10.8Mobile/1.0")
+            .plus(" ArcMap10.8Mobile/1.2.0")
 
         webView.addJavascriptInterface(AndroidFileBridge(), "AndroidBridge")
 
@@ -260,6 +273,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun resolveUriDisplayName(uri: Uri): String? {
+        return try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (idx >= 0) cursor.getString(idx) else null
+                    } else null
+                }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun notifyJsExportStatus(status: String, message: String) {
+        if (!::webView.isInitialized) return
+        val qStatus = JSONObject.quote(status)
+        val qMessage = JSONObject.quote(message)
+        webView.post {
+            webView.evaluateJavascript(
+                "window.__onAndroidExportStatus && window.__onAndroidExportStatus($qStatus, $qMessage);",
+                null
+            )
+        }
+    }
+
     private fun saveToDownloadsFallback(
         safeName: String,
         mimeType: String,
@@ -274,68 +313,124 @@ class MainActivity : ComponentActivity() {
                     put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                 }
                 val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                if (uri != null) {
-                    contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-                }
+                    ?: throw IOException("No se pudo crear archivo en Descargas")
+                contentResolver.openOutputStream(uri)?.use {
+                    it.write(bytes)
+                    it.flush()
+                } ?: throw IOException("No se pudo escribir en Descargas")
             } else {
                 @Suppress("DEPRECATION")
                 val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 if (!dir.exists()) dir.mkdirs()
-                FileOutputStream(File(dir, safeName)).use { it.write(bytes) }
+                FileOutputStream(File(dir, safeName)).use {
+                    it.write(bytes)
+                    it.flush()
+                }
             }
-            Toast.makeText(
-                this@MainActivity,
-                "Guardado en Descargas: $safeName",
-                Toast.LENGTH_LONG
-            ).show()
+            val msg = if (cause != null) {
+                "✓ Guardado en Descargas (respaldo): $safeName"
+            } else {
+                "✓ Guardado en Descargas: $safeName"
+            }
+            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+            notifyJsExportStatus("saved", msg)
         } catch (e: Exception) {
-            val msg = cause?.message ?: e.message
-            Toast.makeText(
-                this@MainActivity,
-                "Error al guardar archivo: $msg",
-                Toast.LENGTH_LONG
-            ).show()
+            val detail = cause?.message ?: e.message ?: "Error desconocido"
+            val errMsg = "Error al guardar archivo: $detail"
+            Toast.makeText(this@MainActivity, errMsg, Toast.LENGTH_LONG).show()
+            notifyJsExportStatus("error", errMsg)
+        }
+    }
+
+    private fun resolveMime(filename: String, mimeType: String): String {
+        val trimmed = mimeType.trim()
+        if (trimmed.isNotEmpty() && trimmed != "application/geo+json") {
+            return trimmed
+        }
+        return when {
+            filename.endsWith(".zip", ignoreCase = true) -> "application/zip"
+            filename.endsWith(".geojson", ignoreCase = true) ||
+                filename.endsWith(".json", ignoreCase = true) -> "application/json"
+            filename.endsWith(".png", ignoreCase = true) -> "image/png"
+            else -> "application/octet-stream"
         }
     }
 
     inner class AndroidFileBridge {
         @JavascriptInterface
+        fun getAppVersion(): String = "1.2.0"
+
+        @JavascriptInterface
         fun saveBase64File(filename: String, mimeType: String, base64Data: String) {
+            saveBase64FileWithPicker(filename, mimeType, base64Data)
+        }
+
+        @JavascriptInterface
+        fun saveBase64FileWithPicker(filename: String, mimeType: String, base64Data: String) {
             runOnUiThread {
                 try {
                     val bytes = Base64.decode(base64Data, Base64.DEFAULT)
-                    val safeName = filename.ifBlank { "arcmap_export.bin" }
-                    val safeMime = mimeType.ifBlank {
-                        when {
-                            safeName.endsWith(".zip", ignoreCase = true) -> "application/zip"
-                            safeName.endsWith(".geojson", ignoreCase = true) ||
-                                safeName.endsWith(".json", ignoreCase = true) -> "application/geo+json"
-                            safeName.endsWith(".png", ignoreCase = true) -> "image/png"
-                            else -> "application/octet-stream"
-                        }
+                    if (bytes.isEmpty()) {
+                        notifyJsExportStatus("error", "El archivo generado está vacío.")
+                        return@runOnUiThread
                     }
+                    val safeName = filename.ifBlank { "arcmap_export.zip" }
+                    val safeMime = resolveMime(safeName, mimeType)
 
                     pendingSaveBytes = bytes
                     pendingSaveName = safeName
                     pendingSaveMime = safeMime
 
-                    val createIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = safeMime
-                        putExtra(Intent.EXTRA_TITLE, safeName)
+                    val mimeCandidates = listOf(safeMime, "application/octet-stream", "*/*").distinct()
+                    var launched = false
+                    var lastError: Exception? = null
+
+                    for (candidateMime in mimeCandidates) {
+                        val createIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = candidateMime
+                            putExtra(Intent.EXTRA_TITLE, safeName)
+                        }
+                        if (createIntent.resolveActivity(packageManager) != null || candidateMime == "*/*") {
+                            try {
+                                notifyJsExportStatus(
+                                    "picker_opened",
+                                    "Abriendo selector de carpeta para '$safeName'..."
+                                )
+                                saveFileLauncher.launch(createIntent)
+                                launched = true
+                                break
+                            } catch (e: Exception) {
+                                lastError = e
+                            }
+                        }
                     }
-                    try {
-                        saveFileLauncher.launch(createIntent)
-                    } catch (_: Exception) {
+
+                    if (!launched) {
                         pendingSaveBytes = null
-                        saveToDownloadsFallback(safeName, safeMime, bytes)
+                        saveToDownloadsFallback(safeName, safeMime, bytes, lastError)
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Error al preparar archivo: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    pendingSaveBytes = null
+                    val errMsg = "Error al preparar archivo: ${e.message}"
+                    Toast.makeText(this@MainActivity, errMsg, Toast.LENGTH_LONG).show()
+                    notifyJsExportStatus("error", errMsg)
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun saveBase64FileToDownloads(filename: String, mimeType: String, base64Data: String) {
+            runOnUiThread {
+                try {
+                    val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+                    val safeName = filename.ifBlank { "arcmap_export.zip" }
+                    val safeMime = resolveMime(safeName, mimeType)
+                    saveToDownloadsFallback(safeName, safeMime, bytes)
+                } catch (e: Exception) {
+                    val errMsg = "Error al guardar en Descargas: ${e.message}"
+                    Toast.makeText(this@MainActivity, errMsg, Toast.LENGTH_LONG).show()
+                    notifyJsExportStatus("error", errMsg)
                 }
             }
         }
