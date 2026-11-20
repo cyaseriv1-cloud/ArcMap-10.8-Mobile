@@ -63,11 +63,85 @@ object ClipTool {
         }
     }
 
+    private const val INSIDE = 0 // 0000
+    private const val LEFT = 1   // 0001
+    private const val RIGHT = 2  // 0010
+    private const val BOTTOM = 4 // 0100
+    private const val TOP = 8    // 1000
+
+    private fun computeOutCode(x: Double, y: Double, box: BoundingBox): Int {
+        var code = INSIDE
+        if (x < box.minX) code = code or LEFT
+        else if (x > box.maxX) code = code or RIGHT
+        if (y < box.minY) code = code or BOTTOM
+        else if (y > box.maxY) code = code or TOP
+        return code
+    }
+
     private fun clipPolyline(line: Polyline, box: BoundingBox): Polyline? {
         val pts = line.points
-        if (pts.isEmpty()) return null
-        val clippedPts = pts.filter { box.contains(it) }
-        return if (clippedPts.size >= 2) Polyline(clippedPts) else null
+        if (pts.size < 2) return null
+
+        val resultPts = mutableListOf<Point>()
+
+        for (i in 0 until pts.size - 1) {
+            var x0 = pts[i].x
+            var y0 = pts[i].y
+            var x1 = pts[i + 1].x
+            var y1 = pts[i + 1].y
+
+            var code0 = computeOutCode(x0, y0, box)
+            var code1 = computeOutCode(x1, y1, box)
+            var accept = false
+
+            while (true) {
+                if ((code0 or code1) == 0) {
+                    accept = true
+                    break
+                } else if ((code0 and code1) != 0) {
+                    break
+                } else {
+                    var x = 0.0
+                    var y = 0.0
+                    val codeOut = if (code0 != 0) code0 else code1
+
+                    if ((codeOut and TOP) != 0) {
+                        x = x0 + (x1 - x0) * (box.maxY - y0) / (y1 - y0)
+                        y = box.maxY
+                    } else if ((codeOut and BOTTOM) != 0) {
+                        x = x0 + (x1 - x0) * (box.minY - y0) / (y1 - y0)
+                        y = box.minY
+                    } else if ((codeOut and RIGHT) != 0) {
+                        y = y0 + (y1 - y0) * (box.maxX - x0) / (x1 - x0)
+                        x = box.maxX
+                    } else if ((codeOut and LEFT) != 0) {
+                        y = y0 + (y1 - y0) * (box.minX - x0) / (x1 - x0)
+                        x = box.minX
+                    }
+
+                    if (codeOut == code0) {
+                        x0 = x
+                        y0 = y
+                        code0 = computeOutCode(x0, y0, box)
+                    } else {
+                        x1 = x
+                        y1 = y
+                        code1 = computeOutCode(x1, y1, box)
+                    }
+                }
+            }
+
+            if (accept) {
+                val p0 = Point(x0, y0)
+                val p1 = Point(x1, y1)
+                if (resultPts.isEmpty() || resultPts.last() != p0) {
+                    resultPts.add(p0)
+                }
+                resultPts.add(p1)
+            }
+        }
+
+        return if (resultPts.size >= 2) Polyline(resultPts) else null
     }
 
     /**

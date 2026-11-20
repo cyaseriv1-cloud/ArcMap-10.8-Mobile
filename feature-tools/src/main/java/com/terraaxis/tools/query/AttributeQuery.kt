@@ -75,7 +75,7 @@ object AttributeQuery {
         val left = condition.substring(0, match.range.first).trim().removeSurrounding("[", "]").removeSurrounding("\"", "\"")
         val right = condition.substring(match.range.last + 1).trim().removeSurrounding("'", "'").removeSurrounding("\"", "\"")
 
-        val rawAttr = feature.attributes[left]
+        val rawAttr = feature.attributes.entries.find { it.key.equals(left, ignoreCase = true) }?.value
 
         val numAttr = (rawAttr as? Number)?.toDouble() ?: rawAttr?.toString()?.toDoubleOrNull()
         val numRight = right.toDoubleOrNull()

@@ -7,12 +7,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.terraaxis.app.viewmodel.MainViewModel
 
@@ -30,25 +33,27 @@ fun ArcGisStatusBar(
     val formattedLat = String.format(java.util.Locale.US, "%.5f°", viewModel.viewport.centerLat)
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
         tonalElevation = 6.dp,
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
                 .horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Status prompt
             statusMsg?.let { msg ->
                 Text(
                     msg,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
                 )
+                VerticalDivider(modifier = Modifier.height(14.dp), color = Color.Gray.copy(alpha = 0.4f))
             }
 
             // Geographic coordinates
@@ -58,6 +63,8 @@ fun ArcGisStatusBar(
                 style = MaterialTheme.typography.labelSmall
             )
 
+            VerticalDivider(modifier = Modifier.height(14.dp), color = Color.Gray.copy(alpha = 0.4f))
+
             // Projected UTM coordinates
             Text(
                 "UTM: ${utm.format()}",
@@ -65,11 +72,14 @@ fun ArcGisStatusBar(
                 style = MaterialTheme.typography.labelSmall
             )
 
+            VerticalDivider(modifier = Modifier.height(14.dp), color = Color.Gray.copy(alpha = 0.4f))
+
             // Scale
             Text(
-                "Escala: $formattedScale",
+                "Escala $formattedScale",
                 fontFamily = FontFamily.Monospace,
-                style = MaterialTheme.typography.labelSmall
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

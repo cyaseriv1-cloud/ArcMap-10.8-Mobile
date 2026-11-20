@@ -20,16 +20,34 @@ import com.terraaxis.map.interaction.MeasureSession
 import com.terraaxis.map.viewport.MapViewport
 import com.terraaxis.tools.analysis.BufferTool
 import com.terraaxis.tools.analysis.ClipTool
+import com.terraaxis.tools.generalization.SimplifyLineTool
 import com.terraaxis.tools.query.AttributeQuery
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
+enum class ArcMapViewMode {
+    DATA_VIEW,
+    LAYOUT_VIEW
+}
+
 class MainViewModel : ViewModel() {
 
-    private val _project = MutableStateFlow(MapProject("TerraAxis Project"))
+    private val _project = MutableStateFlow(MapProject("ArcMap Document (Untitled.mxd)"))
     val project: StateFlow<MapProject> = _project.asStateFlow()
+
+    private val _viewMode = MutableStateFlow(ArcMapViewMode.DATA_VIEW)
+    val viewMode: StateFlow<ArcMapViewMode> = _viewMode.asStateFlow()
+
+    private val _isCatalogVisible = MutableStateFlow(false)
+    val isCatalogVisible: StateFlow<Boolean> = _isCatalogVisible.asStateFlow()
+
+    private val _layoutTitle = MutableStateFlow("MAPA GENERAL DE COBERTURA")
+    val layoutTitle: StateFlow<String> = _layoutTitle.asStateFlow()
+
+    private val _isEditorActive = MutableStateFlow(false)
+    val isEditorActive: StateFlow<Boolean> = _isEditorActive.asStateFlow()
 
     private val _layers = MutableStateFlow<List<VectorLayer>>(emptyList())
     val layers: StateFlow<List<VectorLayer>> = _layers.asStateFlow()
@@ -107,8 +125,11 @@ class MainViewModel : ViewModel() {
 
         when (_activeTool.value) {
             MapToolMode.PAN -> {
-                // In pan mode, single tap can dismiss identify
-                _identifiedFeature.value = null
+                // In pan mode, tap only updates cursor coordinates and clears identify popup if open
+                if (_identifiedFeature.value != null) {
+                    _identifiedFeature.value = null
+                    updateRender()
+                }
             }
             MapToolMode.IDENTIFY -> {
                 performIdentify(geoPoint)
@@ -131,7 +152,9 @@ class MainViewModel : ViewModel() {
     }
 
     private fun performIdentify(tapPoint: Point) {
-        val tolerance = 0.003 * (20.0 - viewport.zoom).coerceAtLeast(1.0)
+        // 28-pixel finger touch tolerance in geographic degrees
+        val tolerance = (viewport.metersPerPixel * 28.0) / 111320.0
+
         for (layer in _layers.value) {
             if (!layer.isVisible) continue
             val index = SpatialIndex()
@@ -139,32 +162,56 @@ class MainViewModel : ViewModel() {
             val found = index.hitTest(tapPoint, tolerance)
             if (found != null) {
                 _identifiedFeature.value = Pair(layer, found)
+                _activeLayer.value = layer
                 _statusMessage.value = "Identificado: ${layer.name} (ID: ${found.id})"
+                updateRender()
                 return
             }
         }
         _identifiedFeature.value = null
         _statusMessage.value = "Ninguna entidad en esa posición"
+        updateRender()
     }
 
     private fun performSelect(tapPoint: Point) {
-        val tolerance = 0.003 * (20.0 - viewport.zoom).coerceAtLeast(1.0)
-        val targetLayer = _activeLayer.value ?: _layers.value.firstOrNull() ?: return
-        val index = SpatialIndex()
-        index.build(targetLayer.features)
-        val found = index.hitTest(tapPoint, tolerance)
+        val tolerance = (viewport.metersPerPixel * 28.0) / 111320.0
 
-        if (found != null) {
-            if (targetLayer.selectedFeatureIds.contains(found.id)) {
-                targetLayer.deselectFeature(found.id)
-            } else {
-                targetLayer.selectFeature(found.id, append = true)
+        // 1. Try active layer first
+        val targetLayer = _activeLayer.value
+        if (targetLayer != null && targetLayer.isVisible) {
+            val index = SpatialIndex()
+            index.build(targetLayer.features)
+            val found = index.hitTest(tapPoint, tolerance)
+            if (found != null) {
+                if (targetLayer.selectedFeatureIds.contains(found.id)) {
+                    targetLayer.deselectFeature(found.id)
+                } else {
+                    targetLayer.selectFeature(found.id, append = true)
+                }
+                _statusMessage.value = "${targetLayer.selectedFeatureIds.size} seleccionados en ${targetLayer.name}"
+                updateRender()
+                return
             }
-            _statusMessage.value = "${targetLayer.selectedFeatureIds.size} entidades seleccionadas en ${targetLayer.name}"
-        } else {
-            targetLayer.clearSelection()
-            _statusMessage.value = "Selección limpiada"
         }
+
+        // 2. If nothing found in active layer, search all other visible layers
+        for (layer in _layers.value) {
+            if (!layer.isVisible || layer.id == targetLayer?.id) continue
+            val index = SpatialIndex()
+            index.build(layer.features)
+            val found = index.hitTest(tapPoint, tolerance)
+            if (found != null) {
+                _activeLayer.value = layer
+                layer.selectFeature(found.id, append = false)
+                _statusMessage.value = "1 seleccionado en ${layer.name} (ID: ${found.id})"
+                updateRender()
+                return
+            }
+        }
+
+        // 3. Nothing hit: clear all selections
+        _layers.value.forEach { it.clearSelection() }
+        _statusMessage.value = "Selección limpiada"
         updateRender()
     }
 
@@ -210,12 +257,21 @@ class MainViewModel : ViewModel() {
     fun zoomIn() {
         viewport.zoomBy(1.0)
         _mapScale.value = viewport.scaleDenominator
+        updateCoordinates(viewport.centerLon, viewport.centerLat)
         updateRender()
     }
 
     fun zoomOut() {
         viewport.zoomBy(-1.0)
         _mapScale.value = viewport.scaleDenominator
+        updateCoordinates(viewport.centerLon, viewport.centerLat)
+        updateRender()
+    }
+
+    fun zoomAround(focalX: Float, focalY: Float, delta: Double) {
+        viewport.zoomAround(focalX, focalY, delta)
+        _mapScale.value = viewport.scaleDenominator
+        updateCoordinates(viewport.centerLon, viewport.centerLat)
         updateRender()
     }
 
@@ -229,6 +285,7 @@ class MainViewModel : ViewModel() {
         if (overallBox != BoundingBox.EMPTY) {
             viewport.zoomToExtent(overallBox)
             _mapScale.value = viewport.scaleDenominator
+            updateCoordinates(viewport.centerLon, viewport.centerLat)
             updateRender()
             _statusMessage.value = "Extensión completa"
         }
@@ -239,6 +296,55 @@ class MainViewModel : ViewModel() {
             it.isVisible = !it.isVisible
             updateRender()
         }
+    }
+
+    fun setLayerOpacity(layerId: String, opacity: Float) {
+        _layers.value.find { it.id == layerId }?.let {
+            it.opacity = opacity.coerceIn(0.05f, 1.0f)
+            updateRender()
+        }
+    }
+
+    fun moveLayerUp(layerId: String) {
+        val list = _layers.value.toMutableList()
+        val index = list.indexOfFirst { it.id == layerId }
+        if (index > 0) {
+            val item = list.removeAt(index)
+            list.add(index - 1, item)
+            _layers.value = list
+            updateRender()
+        }
+    }
+
+    fun moveLayerDown(layerId: String) {
+        val list = _layers.value.toMutableList()
+        val index = list.indexOfFirst { it.id == layerId }
+        if (index >= 0 && index < list.size - 1) {
+            val item = list.removeAt(index)
+            list.add(index + 1, item)
+            _layers.value = list
+            updateRender()
+        }
+    }
+
+    fun removeLayer(layerId: String) {
+        val list = _layers.value.toMutableList()
+        list.removeAll { it.id == layerId }
+        _layers.value = list
+        if (_activeLayer.value?.id == layerId) {
+            _activeLayer.value = list.firstOrNull()
+        }
+        updateRender()
+        _statusMessage.value = "Capa eliminada"
+    }
+
+    fun addLayer(layer: VectorLayer) {
+        val list = _layers.value.toMutableList()
+        list.add(0, layer)
+        _layers.value = list
+        _activeLayer.value = layer
+        updateRender()
+        _statusMessage.value = "Capa añadida: ${layer.name}"
     }
 
     fun setActiveLayer(layer: VectorLayer) {
@@ -266,15 +372,70 @@ class MainViewModel : ViewModel() {
         _identifiedFeature.value = null
     }
 
+    fun setViewMode(mode: ArcMapViewMode) {
+        _viewMode.value = mode
+        _statusMessage.value = if (mode == ArcMapViewMode.DATA_VIEW) "Modo: Data View (Edición Geográfica)" else "Modo: Layout View (Composición de Impresión)"
+        updateRender()
+    }
+
+    fun toggleCatalog(visible: Boolean) {
+        _isCatalogVisible.value = visible
+    }
+
+    fun setLayoutTitle(title: String) {
+        _layoutTitle.value = title
+        updateRender()
+    }
+
+    fun toggleEditor(active: Boolean) {
+        _isEditorActive.value = active
+        if (!active && (_activeTool.value == MapToolMode.DIGITIZE_POINT || _activeTool.value == MapToolMode.DIGITIZE_LINE || _activeTool.value == MapToolMode.DIGITIZE_POLYGON)) {
+            setTool(MapToolMode.PAN)
+        }
+        _statusMessage.value = if (active) "Editor iniciado: Listo para digitalizar" else "Editor detenido"
+    }
+
+    fun loadShapefile(shpFile: File): Boolean {
+        return try {
+            val layer = com.terraaxis.data.shapefile.ShapefileReader.read(shpFile)
+            addLayer(layer)
+            zoomFullExtent()
+            _statusMessage.value = "Shapefile cargado: ${layer.name} (${layer.features.size} entidades)"
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _statusMessage.value = "Error al leer Shapefile: ${e.message}"
+            false
+        }
+    }
+
+    fun loadGeoJsonFile(geoJsonFile: File): Boolean {
+        return try {
+            val layer = com.terraaxis.data.geojson.GeoJsonParser.parseFile(geoJsonFile)
+            addLayer(layer)
+            zoomFullExtent()
+            _statusMessage.value = "GeoJSON cargado: ${layer.name} (${layer.features.size} entidades)"
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _statusMessage.value = "Error al leer GeoJSON: ${e.message}"
+            false
+        }
+    }
+
+    fun zoomToScale(scaleDenominator: Long) {
+        if (scaleDenominator <= 0) return
+        viewport.setScale(scaleDenominator)
+        _mapScale.value = viewport.scaleDenominator
+        updateCoordinates(viewport.centerLon, viewport.centerLat)
+        updateRender()
+    }
+
     // ArcToolbox Executions
     fun runBuffer(layer: VectorLayer, distanceMeters: Double) {
         val buffered = BufferTool.execute(layer, distanceMeters)
-        val currentList = _layers.value.toMutableList()
-        currentList.add(0, buffered) // Add on top
-        _layers.value = currentList
-        _activeLayer.value = buffered
+        addLayer(buffered)
         _statusMessage.value = "Buffer de ${distanceMeters.toInt()}m generado con éxito"
-        updateRender()
     }
 
     fun runClip(layer: VectorLayer) {
@@ -288,12 +449,16 @@ class MainViewModel : ViewModel() {
             maxOf(pTopLeft.y, pBottomRight.y)
         )
         val clipped = ClipTool.execute(layer, clipBox)
-        val currentList = _layers.value.toMutableList()
-        currentList.add(0, clipped)
-        _layers.value = currentList
-        _activeLayer.value = clipped
+        addLayer(clipped)
         _statusMessage.value = "Capa recortada por la extensión actual"
-        updateRender()
+    }
+
+    fun runSimplify(layer: VectorLayer, toleranceMeters: Double) {
+        // Tolerance in degrees roughly toleranceMeters / 111320
+        val degTolerance = toleranceMeters / 111320.0
+        val simplified = SimplifyLineTool.execute(layer, degTolerance)
+        addLayer(simplified)
+        _statusMessage.value = "Capa simplificada (Ramer-Douglas-Peucker ${toleranceMeters}m)"
     }
 
     fun runSelectByAttributes(layer: VectorLayer, whereClause: String) {
@@ -304,8 +469,50 @@ class MainViewModel : ViewModel() {
 
     fun runCalculateGeometry(layer: VectorLayer, fieldName: String, property: GeometryProperty) {
         layer.table.calculateGeometry(fieldName, property)
-        _statusMessage.value = "Geometría calculada en el campo $fieldName"
+        // Forzar re-emisión del StateFlow para que Compose recomponga la tabla de atributos
+        _layers.value = _layers.value.toMutableList()
+        // También refrescar la capa seleccionada en la tabla
+        if (_selectedLayerForTable.value?.id == layer.id) {
+            _selectedLayerForTable.value = null
+            _selectedLayerForTable.value = layer
+        }
+        _statusMessage.value = "Geometría calculada en el campo $fieldName (${layer.features.size} registros)"
         updateRender()
+    }
+
+    fun refreshLayerTable(layer: VectorLayer) {
+        // Fuerza re-render de la tabla de atributos para la capa dada
+        _layers.value = _layers.value.toMutableList()
+        if (_selectedLayerForTable.value?.id == layer.id) {
+            val current = _selectedLayerForTable.value
+            _selectedLayerForTable.value = null
+            _selectedLayerForTable.value = current
+        }
+        updateRender()
+    }
+
+    fun setLayerSymbology(layerId: String, symbology: com.terraaxis.core.symbology.LayerSymbology) {
+        val list = _layers.value.toMutableList()
+        val idx = list.indexOfFirst { it.id == layerId }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(symbology = symbology)
+            _layers.value = list
+            if (_activeLayer.value?.id == layerId) _activeLayer.value = list[idx]
+            updateRender()
+            _statusMessage.value = "Simbología actualizada"
+        }
+    }
+
+    fun setLayerLabelField(layerId: String, fieldName: String?) {
+        val list = _layers.value.toMutableList()
+        val idx = list.indexOfFirst { it.id == layerId }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(labelFieldName = fieldName)
+            _layers.value = list
+            if (_activeLayer.value?.id == layerId) _activeLayer.value = list[idx]
+            updateRender()
+            _statusMessage.value = if (fieldName != null) "Etiquetas activadas: $fieldName" else "Etiquetas desactivadas"
+        }
     }
 
     fun updateRender() {

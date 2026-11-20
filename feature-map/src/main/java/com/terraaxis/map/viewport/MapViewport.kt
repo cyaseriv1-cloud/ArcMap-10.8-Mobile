@@ -23,6 +23,17 @@ data class MapViewport(
             return scale.toLong().coerceAtLeast(100L)
         }
 
+    fun setScale(targetScale: Long) {
+        if (targetScale <= 0) return
+        val latRad = Math.toRadians(centerLat)
+        val numerator = 156543.03392 * cos(latRad)
+        val denominator = targetScale * 0.000264583
+        if (denominator > 0.0) {
+            val calculatedZoom = log2(numerator / denominator)
+            zoom = calculatedZoom.coerceIn(2.0, 21.0)
+        }
+    }
+
     fun geoToScreen(lon: Double, lat: Double): Pair<Float, Float> {
         val mercCenter = ProjectionEngine.wgs84ToWebMercator(centerLat, centerLon)
         val mercPoint = ProjectionEngine.wgs84ToWebMercator(lat, lon)
@@ -78,7 +89,31 @@ data class MapViewport(
         centerLat = newCenter.y
     }
 
+    val metersPerPixel: Double
+        get() {
+            val worldSize = 256.0 * 2.0.pow(zoom)
+            return 40075016.686 / worldSize
+        }
+
     fun zoomBy(delta: Double) {
         zoom = (zoom + delta).coerceIn(2.0, 21.0)
+    }
+
+    fun zoomAround(focalX: Float, focalY: Float, delta: Double) {
+        val focalGeo = screenToGeo(focalX, focalY)
+        val focalMerc = ProjectionEngine.wgs84ToWebMercator(focalGeo.y, focalGeo.x)
+
+        zoom = (zoom + delta).coerceIn(2.0, 21.0)
+
+        val newMpp = metersPerPixel
+        val dx = (focalX - screenWidth / 2f) * newMpp
+        val dy = (screenHeight / 2f - focalY) * newMpp
+
+        val newMercCenterX = focalMerc.x - dx
+        val newMercCenterY = focalMerc.y - dy
+
+        val newCenter = ProjectionEngine.webMercatorToWgs84(newMercCenterX, newMercCenterY)
+        centerLon = newCenter.x
+        centerLat = newCenter.y
     }
 }

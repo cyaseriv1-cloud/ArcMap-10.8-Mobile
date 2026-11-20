@@ -27,15 +27,20 @@ fun AttributeTableSheet(
     viewModel: MainViewModel,
     onClose: () -> Unit
 ) {
+    // Observar el trigger de render para forzar recomposición cuando cambien campos/features
+    val renderTrigger by viewModel.mapRenderTrigger.collectAsState()
+
     var searchQuery by remember { mutableStateOf("") }
     var sortAscending by remember { mutableStateOf(true) }
     var sortedField by remember { mutableStateOf<String?>(null) }
     var showCalcGeometryDialog by remember { mutableStateOf(false) }
 
-    val selectedCount = layer.selectedFeatureIds.size
-    val totalCount = layer.features.size
+    // Usar renderTrigger como clave para que Compose recomponga cuando se calculen nuevos campos
+    val selectedCount = remember(renderTrigger) { layer.selectedFeatureIds.size }
+    val totalCount = remember(renderTrigger) { layer.features.size }
+    val currentFields = remember(renderTrigger) { layer.fields.toList() }
 
-    val filteredFeatures = remember(layer.features, searchQuery, sortedField, sortAscending) {
+    val filteredFeatures = remember(renderTrigger, layer.features, searchQuery, sortedField, sortAscending) {
         var list = if (searchQuery.isBlank()) {
             layer.features.toList()
         } else {
@@ -112,10 +117,13 @@ fun AttributeTableSheet(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar en la tabla...") },
+                    placeholder = { Text("Buscar...", maxLines = 1) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(max = 56.dp),
+                    singleLine = true,
+                    maxLines = 1
                 )
 
                 FilledTonalButton(
@@ -134,6 +142,26 @@ fun AttributeTableSheet(
                     }
                 ) {
                     Text("Limpiar")
+                }
+
+                if (selectedCount > 0) {
+                    IconButton(
+                        onClick = {
+                            var selectedBox = com.terraaxis.core.geometry.BoundingBox.EMPTY
+                            for (feat in layer.getSelectedFeatures()) {
+                                val g = feat.geometry ?: continue
+                                selectedBox = selectedBox.expandToInclude(g.boundingBox)
+                            }
+                            if (selectedBox != com.terraaxis.core.geometry.BoundingBox.EMPTY) {
+                                viewModel.viewport.zoomToExtent(selectedBox)
+                                viewModel.updateCoordinates(viewModel.viewport.centerLon, viewModel.viewport.centerLat)
+                                viewModel.updateRender()
+                                onClose()
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.CenterFocusStrong, contentDescription = "Zoom a Selección", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
 
@@ -160,7 +188,7 @@ fun AttributeTableSheet(
                             Text("#", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                         }
 
-                        for (field in layer.fields) {
+                        for (field in currentFields) {
                             Row(
                                 modifier = Modifier
                                     .width(140.dp)
@@ -228,7 +256,7 @@ fun AttributeTableSheet(
                                     )
                                 }
 
-                                for (field in layer.fields) {
+                                for (field in currentFields) {
                                     Box(modifier = Modifier.width(140.dp).padding(horizontal = 4.dp)) {
                                         val valStr = feat.attributes[field.name]?.toString() ?: "<null>"
                                         Text(

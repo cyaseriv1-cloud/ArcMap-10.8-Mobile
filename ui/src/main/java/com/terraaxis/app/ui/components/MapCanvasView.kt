@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -26,37 +25,40 @@ fun MapCanvasView(
     val digitizeSession by viewModel.digitizeSession.collectAsState()
     val renderTrigger by viewModel.mapRenderTrigger.collectAsState()
 
-    var canvasSize by remember { mutableStateOf(Offset(1080f, 1920f)) }
-
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(activeTool) {
-                if (activeTool == MapToolMode.PAN) {
-                    detectTransformGestures { _, pan, zoom, _ ->
+            .pointerInput(Unit) {
+                detectTransformGestures(panZoomLock = false) { centroid, pan, zoom, _ ->
+                    // Pan
+                    if (pan.x != 0f || pan.y != 0f) {
                         viewModel.viewport.panByPixels(pan.x, pan.y)
-                        if (zoom != 1f) {
-                            val zoomDelta = kotlin.math.ln(zoom.toDouble()) / kotlin.math.ln(2.0)
-                            viewModel.viewport.zoomBy(zoomDelta)
-                        }
+                    }
+
+                    // Pinch zoom around touch focal point
+                    if (zoom != 1f) {
+                        val zoomDelta = kotlin.math.ln(zoom.toDouble()) / kotlin.math.ln(2.0)
+                        viewModel.zoomAround(centroid.x, centroid.y, zoomDelta)
+                    } else if (pan.x != 0f || pan.y != 0f) {
                         viewModel.updateCoordinates(viewModel.viewport.centerLon, viewModel.viewport.centerLat)
                         viewModel.updateRender()
                     }
                 }
             }
-            .pointerInput(activeTool) {
+            .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     viewModel.handleMapTap(offset.x, offset.y)
                 }
             }
     ) {
-        // Update viewport dimensions
+        // Sync viewport dimensions
         if (size.width > 0 && size.height > 0) {
             viewModel.viewport.screenWidth = size.width
             viewModel.viewport.screenHeight = size.height
         }
 
-        // Trigger recomposition on state changes
+        // Trigger recomposition on state updates
+        @Suppress("UNUSED_VARIABLE")
         val trigger = renderTrigger
 
         drawIntoCanvas { canvas ->

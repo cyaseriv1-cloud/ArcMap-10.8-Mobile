@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import com.terraaxis.core.geometry.Geometry
 import com.terraaxis.core.geometry.MultiPoint
@@ -20,39 +21,98 @@ import com.terraaxis.core.symbology.LayerSymbology
 import com.terraaxis.map.interaction.DigitizeSession
 import com.terraaxis.map.interaction.MeasureSession
 import com.terraaxis.map.viewport.MapViewport
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 class MapCanvasRenderer {
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 32f
-        color = Color.DKGRAY
-        typeface = Typeface.DEFAULT_BOLD
+        textSize = 28f
+        color = Color.rgb(20, 20, 20)
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
+
+    private val textHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 28f
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 6f
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.argb(40, 0, 0, 0)
-        strokeWidth = 1f
+        color = Color.argb(45, 0, 0, 0)
+        strokeWidth = 1.2f
     }
+
+    private val gridTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 20f
+        color = Color.rgb(100, 100, 100)
+        typeface = Typeface.MONOSPACE
+    }
+
     private val selectionFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.argb(120, 0, 255, 255) // Cyan fill
+        color = Color.argb(130, 0, 255, 255) // ArcGIS Cyan fill
     }
+
     private val selectionStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.rgb(0, 255, 255) // Cyan stroke
-        strokeWidth = 6f
+        color = Color.rgb(0, 255, 255) // ArcGIS Cyan outline
+        strokeWidth = 7f
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
     }
+
+    private val selectionGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.argb(80, 0, 200, 255)
+        strokeWidth = 14f
+    }
+
     private val measurePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.rgb(233, 30, 99) // Pink / Magenta measure line
-        strokeWidth = 5f
-        pathEffect = DashPathEffect(floatArrayOf(15f, 10f), 0f)
+        color = Color.rgb(233, 30, 99) // Magenta measure line
+        strokeWidth = 6f
+        pathEffect = DashPathEffect(floatArrayOf(20f, 12f), 0f)
     }
+
     private val measureNodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         color = Color.rgb(233, 30, 99)
+    }
+
+    private val measureNodeInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.WHITE
+    }
+
+    private val scaleBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.BLACK
+    }
+
+    private val scaleBarWhitePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.WHITE
+    }
+
+    private val scaleBarStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.BLACK
+        strokeWidth = 2f
+    }
+
+    private val scaleBarTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 22f
+        color = Color.BLACK
+        typeface = Typeface.DEFAULT_BOLD
     }
 
     private val path = Path()
@@ -64,8 +124,8 @@ class MapCanvasRenderer {
         measureSession: MeasureSession? = null,
         digitizeSession: DigitizeSession? = null
     ) {
-        // 1. Draw clean GIS background (Light warm background like ArcMap paper)
-        canvas.drawColor(Color.rgb(248, 249, 250))
+        // 1. Draw GIS Map Paper background
+        canvas.drawColor(Color.rgb(246, 247, 248))
 
         // 2. Draw Cartographic Coordinate Grid (Graticule)
         drawGraticule(canvas, viewport)
@@ -82,6 +142,10 @@ class MapCanvasRenderer {
 
         // 5. Draw Active Digitize Session
         digitizeSession?.let { drawDigitizeOverlay(canvas, viewport, it) }
+
+        // 6. Draw Cartographic Scale Bar & North Arrow
+        drawScaleBar(canvas, viewport)
+        drawNorthArrow(canvas, viewport)
     }
 
     private fun drawGraticule(canvas: Canvas, viewport: MapViewport) {
@@ -94,29 +158,61 @@ class MapCanvasRenderer {
         val minLat = minOf(pTopLeft.y, pBottomRight.y)
         val maxLat = maxOf(pTopLeft.y, pBottomRight.y)
 
-        var lon = (minLon / step).toInt() * step
-        while (lon <= maxLon) {
+        val minLabelSpacingPx = 90f // Mínima separación en px entre etiquetas para evitar solapamiento
+
+        // Longitude lines
+        var lon = floor(minLon / step) * step
+        var lastLonLabelX = -999f
+        while (lon <= maxLon + step * 0.5) {
             val (sx, _) = viewport.geoToScreen(lon, viewport.centerLat)
-            canvas.drawLine(sx, 0f, sx, viewport.screenHeight, gridPaint)
+            if (sx in 0f..viewport.screenWidth) {
+                canvas.drawLine(sx, 0f, sx, viewport.screenHeight, gridPaint)
+                // Solo dibujar etiqueta si hay suficiente espacio desde la anterior
+                if (sx - lastLonLabelX >= minLabelSpacingPx) {
+                    val lonText = formatCoord(lon, isLat = false)
+                    canvas.drawText(lonText, sx + 4f, 30f, gridTextPaint)
+                    lastLonLabelX = sx
+                }
+            }
             lon += step
         }
 
-        var lat = (minLat / step).toInt() * step
-        while (lat <= maxLat) {
+        // Latitude lines
+        var lat = floor(minLat / step) * step
+        var lastLatLabelY = 999f
+        while (lat <= maxLat + step * 0.5) {
             val (_, sy) = viewport.geoToScreen(viewport.centerLon, lat)
-            canvas.drawLine(0f, sy, viewport.screenWidth, sy, gridPaint)
+            if (sy in 0f..viewport.screenHeight) {
+                canvas.drawLine(0f, sy, viewport.screenWidth, sy, gridPaint)
+                // Solo dibujar etiqueta si hay suficiente espacio desde la anterior
+                if (lastLatLabelY - sy >= minLabelSpacingPx) {
+                    val latText = formatCoord(lat, isLat = true)
+                    canvas.drawText(latText, 10f, sy - 4f, gridTextPaint)
+                    lastLatLabelY = sy
+                }
+            }
             lat += step
         }
+    }
+
+    private fun formatCoord(value: Double, isLat: Boolean): String {
+        val direction = if (isLat) {
+            if (value >= 0) "N" else "S"
+        } else {
+            if (value >= 0) "E" else "W"
+        }
+        val absVal = kotlin.math.abs(value)
+        return String.format(java.util.Locale.US, "%.3f°%s", absVal, direction)
     }
 
     private fun calculateGridStep(zoom: Double): Double = when {
         zoom >= 16 -> 0.005
         zoom >= 14 -> 0.01
-        zoom >= 12 -> 0.05
-        zoom >= 10 -> 0.1
-        zoom >= 8 -> 0.5
-        zoom >= 6 -> 1.0
-        else -> 5.0
+        zoom >= 12 -> 0.02
+        zoom >= 10 -> 0.05
+        zoom >= 8 -> 0.2
+        zoom >= 6 -> 0.5
+        else -> 2.0
     }
 
     private fun drawLayer(canvas: Canvas, viewport: MapViewport, layer: VectorLayer) {
@@ -148,7 +244,7 @@ class MapCanvasRenderer {
                 else -> {}
             }
 
-            // Draw label if configured
+            // Draw label with halo
             layer.labelFieldName?.let { fieldName ->
                 val label = feature.getString(fieldName)
                 if (!label.isNullOrBlank()) {
@@ -166,17 +262,20 @@ class MapCanvasRenderer {
         isSelected: Boolean
     ) {
         val (sx, sy) = viewport.geoToScreen(point.x, point.y)
-        if (sx < -50 || sx > viewport.screenWidth + 50 || sy < -50 || sy > viewport.screenHeight + 50) return
+        if (sx < -60 || sx > viewport.screenWidth + 60 || sy < -60 || sy > viewport.screenHeight + 60) return
 
-        val baseRadius = if (symbology is LayerSymbology.Simple) symbology.pointSizeDp * 2f else 16f
+        val baseRadius = if (symbology is LayerSymbology.Simple) symbology.pointSizeDp * 2.2f else 18f
 
-        if (isSelected) {
-            canvas.drawCircle(sx, sy, baseRadius + 6f, selectionStrokePaint)
-            canvas.drawCircle(sx, sy, baseRadius + 6f, selectionFillPaint)
-        }
-
+        // Draw normal point
         canvas.drawCircle(sx, sy, baseRadius, fillPaint)
         canvas.drawCircle(sx, sy, baseRadius, strokePaint)
+
+        // If selected: draw glowing cyan outline ON TOP!
+        if (isSelected) {
+            canvas.drawCircle(sx, sy, baseRadius + 8f, selectionGlowPaint)
+            canvas.drawCircle(sx, sy, baseRadius + 4f, selectionStrokePaint)
+            canvas.drawCircle(sx, sy, baseRadius + 4f, selectionFillPaint)
+        }
     }
 
     private fun drawPolyline(canvas: Canvas, viewport: MapViewport, polyline: Polyline, isSelected: Boolean) {
@@ -192,10 +291,14 @@ class MapCanvasRenderer {
             path.lineTo(px, py)
         }
 
+        // Draw normal polyline first
+        canvas.drawPath(path, strokePaint)
+
+        // If selected: draw cyan selection ON TOP!
         if (isSelected) {
+            canvas.drawPath(path, selectionGlowPaint)
             canvas.drawPath(path, selectionStrokePaint)
         }
-        canvas.drawPath(path, strokePaint)
     }
 
     private fun drawPolygon(canvas: Canvas, viewport: MapViewport, polygon: Polygon, isSelected: Boolean) {
@@ -203,6 +306,8 @@ class MapCanvasRenderer {
         if (rings.isEmpty() || rings[0].size < 3) return
 
         path.reset()
+        path.fillType = Path.FillType.EVEN_ODD
+
         for (ring in rings) {
             if (ring.size < 3) continue
             val (startX, startY) = viewport.geoToScreen(ring[0].x, ring[0].y)
@@ -214,31 +319,44 @@ class MapCanvasRenderer {
             path.close()
         }
 
-        if (isSelected) {
-            canvas.drawPath(path, selectionFillPaint)
-            canvas.drawPath(path, selectionStrokePaint)
-        }
-
+        // 1. Draw regular polygon fill and stroke FIRST
         canvas.drawPath(path, fillPaint)
         canvas.drawPath(path, strokePaint)
+
+        // 2. If selected: draw ArcGIS Cyan highlight OVER the normal fill and stroke!
+        if (isSelected) {
+            canvas.drawPath(path, selectionFillPaint)
+            canvas.drawPath(path, selectionGlowPaint)
+            canvas.drawPath(path, selectionStrokePaint)
+        }
     }
 
     private fun drawLabel(canvas: Canvas, viewport: MapViewport, geom: Geometry, text: String) {
         val (lx, ly) = when (geom) {
-            is Point -> viewport.geoToScreen(geom.x, geom.y)
+            is Point -> {
+                val (px, py) = viewport.geoToScreen(geom.x, geom.y)
+                Pair(px + 16f, py - 12f)
+            }
             is Polygon -> {
                 val c = geom.centroid()
-                viewport.geoToScreen(c.x, c.y)
+                val (cx, cy) = viewport.geoToScreen(c.x, c.y)
+                Pair(cx, cy)
             }
             is Polyline -> {
                 val mid = geom.points.getOrNull(geom.points.size / 2) ?: Point(0.0, 0.0)
-                viewport.geoToScreen(mid.x, mid.y)
+                val (mx, my) = viewport.geoToScreen(mid.x, mid.y)
+                Pair(mx, my - 10f)
             }
-            else -> viewport.geoToScreen(geom.boundingBox.centerX, geom.boundingBox.centerY)
+            else -> {
+                val (bx, by) = viewport.geoToScreen(geom.boundingBox.centerX, geom.boundingBox.centerY)
+                Pair(bx, by)
+            }
         }
 
-        if (lx in 0f..viewport.screenWidth && ly in 0f..viewport.screenHeight) {
-            canvas.drawText(text, lx + 12f, ly - 8f, textPaint)
+        if (lx in -100f..viewport.screenWidth + 100f && ly in -100f..viewport.screenHeight + 100f) {
+            // Draw halo first, then text on top
+            canvas.drawText(text, lx, ly, textHaloPaint)
+            canvas.drawText(text, lx, ly, textPaint)
         }
     }
 
@@ -260,8 +378,9 @@ class MapCanvasRenderer {
         // Draw nodes
         for (p in pts) {
             val (px, py) = viewport.geoToScreen(p.x, p.y)
-            canvas.drawCircle(px, py, 14f, measureNodePaint)
-            canvas.drawCircle(px, py, 18f, strokePaint)
+            canvas.drawCircle(px, py, 16f, measureNodePaint)
+            canvas.drawCircle(px, py, 10f, measureNodeInnerPaint)
+            canvas.drawCircle(px, py, 4f, measureNodePaint)
         }
     }
 
@@ -284,6 +403,81 @@ class MapCanvasRenderer {
         for (p in pts) {
             val (px, py) = viewport.geoToScreen(p.x, p.y)
             canvas.drawRect(px - 10f, py - 10f, px + 10f, py + 10f, fillPaint)
+            canvas.drawRect(px - 10f, py - 10f, px + 10f, py + 10f, strokePaint)
         }
+    }
+
+    private fun drawScaleBar(canvas: Canvas, viewport: MapViewport) {
+        val mpp = viewport.metersPerPixel
+        val targetPixels = 200.0 // Desired width in pixels for scale bar
+        val rawMeters = targetPixels * mpp
+
+        // Round rawMeters to a nice round number (e.g., 50, 100, 200, 500, 1000, 2000, 5000, 10000)
+        val niceMeters = getNiceScaleDistance(rawMeters)
+        val barWidthPx = (niceMeters / mpp).toFloat()
+
+        val startX = 32f
+        val startY = viewport.screenHeight - 50f
+        val barHeight = 12f
+
+        // Draw alternating black/white segments
+        val halfW = barWidthPx / 2f
+        // Left segment (black)
+        canvas.drawRect(startX, startY, startX + halfW, startY + barHeight, scaleBarPaint)
+        // Right segment (white)
+        canvas.drawRect(startX + halfW, startY, startX + barWidthPx, startY + barHeight, scaleBarWhitePaint)
+        // Outline
+        canvas.drawRect(startX, startY, startX + barWidthPx, startY + barHeight, scaleBarStrokePaint)
+        // Center divider line
+        canvas.drawLine(startX + halfW, startY, startX + halfW, startY + barHeight, scaleBarStrokePaint)
+
+        // Label
+        val label = if (niceMeters >= 1000.0) {
+            "${(niceMeters / 1000.0).roundToInt()} km"
+        } else {
+            "${niceMeters.roundToInt()} m"
+        }
+
+        canvas.drawText("0", startX - 4f, startY - 8f, scaleBarTextPaint)
+        canvas.drawText(label, startX + barWidthPx - 20f, startY - 8f, scaleBarTextPaint)
+    }
+
+    private fun getNiceScaleDistance(rawMeters: Double): Double {
+        val exponent = floor(kotlin.math.log10(rawMeters))
+        val pow10 = Math.pow(10.0, exponent)
+        val fraction = rawMeters / pow10
+        val niceFraction = when {
+            fraction < 1.5 -> 1.0
+            fraction < 3.5 -> 2.0
+            fraction < 7.5 -> 5.0
+            else -> 10.0
+        }
+        return niceFraction * pow10
+    }
+
+    private fun drawNorthArrow(canvas: Canvas, viewport: MapViewport) {
+        val cx = viewport.screenWidth - 70f
+        val cy = 100f
+        val size = 26f
+
+        // Draw north arrow
+        val arrowPath = Path()
+        arrowPath.moveTo(cx, cy - size)
+        arrowPath.lineTo(cx - size * 0.45f, cy + size * 0.7f)
+        arrowPath.lineTo(cx, cy + size * 0.35f)
+        arrowPath.close()
+
+        canvas.drawPath(arrowPath, scaleBarPaint)
+
+        val rightArrowPath = Path()
+        rightArrowPath.moveTo(cx, cy - size)
+        rightArrowPath.lineTo(cx + size * 0.45f, cy + size * 0.7f)
+        rightArrowPath.lineTo(cx, cy + size * 0.35f)
+        rightArrowPath.close()
+
+        canvas.drawPath(rightArrowPath, scaleBarWhitePaint)
+        canvas.drawPath(rightArrowPath, scaleBarStrokePaint)
+
+        canvas.drawText("N", cx - 8f, cy - size - 6f, scaleBarTextPaint)
     }
 }

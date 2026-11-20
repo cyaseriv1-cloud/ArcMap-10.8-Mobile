@@ -88,7 +88,7 @@ class AttributeTable(
 
     /**
      * ArcMap-like "Calculate Geometry":
-     * Computes area, length, or centroid coordinates directly into an attribute field!
+     * Computes geodesic area, length, or centroid coordinates directly into an attribute field!
      */
     fun calculateGeometry(targetField: String, property: GeometryProperty) {
         val field = getField(targetField) ?: run {
@@ -101,12 +101,39 @@ class AttributeTable(
             val geom = f.geometry ?: continue
             val value: Double? = when (property) {
                 GeometryProperty.AREA -> when (geom) {
-                    is Polygon -> geom.areaPlanar()
+                    is Polygon -> {
+                        // Geodesic area in square meters
+                        val outerArea = com.terraaxis.core.crs.ProjectionEngine.geodesicPolygonAreaSquareMeters(geom.exteriorRing)
+                        var holesArea = 0.0
+                        for (i in 1 until geom.rings.size) {
+                            holesArea += com.terraaxis.core.crs.ProjectionEngine.geodesicPolygonAreaSquareMeters(geom.rings[i])
+                        }
+                        kotlin.math.max(0.0, outerArea - holesArea)
+                    }
                     else -> null
                 }
                 GeometryProperty.LENGTH_OR_PERIMETER -> when (geom) {
-                    is Polyline -> geom.lengthPlanar()
-                    is Polygon -> geom.perimeterPlanar()
+                    is Polyline -> {
+                        // Geodesic length in meters
+                        var totalMeters = 0.0
+                        for (i in 0 until geom.points.size - 1) {
+                            totalMeters += com.terraaxis.core.crs.ProjectionEngine.geodesicDistanceMeters(geom.points[i], geom.points[i + 1])
+                        }
+                        totalMeters
+                    }
+                    is Polygon -> {
+                        // Geodesic perimeter in meters
+                        var totalMeters = 0.0
+                        for (ring in geom.rings) {
+                            for (i in 0 until ring.size - 1) {
+                                totalMeters += com.terraaxis.core.crs.ProjectionEngine.geodesicDistanceMeters(ring[i], ring[i + 1])
+                            }
+                            if (ring.first() != ring.last()) {
+                                totalMeters += com.terraaxis.core.crs.ProjectionEngine.geodesicDistanceMeters(ring.last(), ring.first())
+                            }
+                        }
+                        totalMeters
+                    }
                     else -> null
                 }
                 GeometryProperty.CENTROID_X -> when (geom) {

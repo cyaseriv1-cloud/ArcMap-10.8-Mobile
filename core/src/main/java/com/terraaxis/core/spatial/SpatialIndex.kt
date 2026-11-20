@@ -1,10 +1,9 @@
 package com.terraaxis.core.spatial
 
-import com.terraaxis.core.geometry.BoundingBox
-import com.terraaxis.core.geometry.Point
-import com.terraaxis.core.geometry.Polygon
-import com.terraaxis.core.geometry.Polyline
+import com.terraaxis.core.geometry.*
 import com.terraaxis.core.model.Feature
+import kotlin.math.floor
+import kotlin.math.sqrt
 
 class SpatialIndex(
     private val cellSizeDegrees: Double = 0.05
@@ -20,13 +19,17 @@ class SpatialIndex(
         features.forEach { insert(it) }
     }
 
+    private fun cellCoord(v: Double): Int = floor(v / cellSizeDegrees).toInt()
+
     fun insert(feature: Feature) {
         val geom = feature.geometry ?: return
         val box = geom.boundingBox
-        val minCellX = (box.minX / cellSizeDegrees).toInt()
-        val maxCellX = (box.maxX / cellSizeDegrees).toInt()
-        val minCellY = (box.minY / cellSizeDegrees).toInt()
-        val maxCellY = (box.maxY / cellSizeDegrees).toInt()
+        if (box == BoundingBox.EMPTY) return
+
+        val minCellX = cellCoord(box.minX)
+        val maxCellX = cellCoord(box.maxX)
+        val minCellY = cellCoord(box.minY)
+        val maxCellY = cellCoord(box.maxY)
 
         for (cx in minCellX..maxCellX) {
             for (cy in minCellY..maxCellY) {
@@ -40,10 +43,12 @@ class SpatialIndex(
      * Finds candidate features intersecting the given query bounding box.
      */
     fun query(box: BoundingBox): List<Feature> {
-        val minCellX = (box.minX / cellSizeDegrees).toInt()
-        val maxCellX = (box.maxX / cellSizeDegrees).toInt()
-        val minCellY = (box.minY / cellSizeDegrees).toInt()
-        val maxCellY = (box.maxY / cellSizeDegrees).toInt()
+        if (box == BoundingBox.EMPTY) return emptyList()
+
+        val minCellX = cellCoord(box.minX)
+        val maxCellX = cellCoord(box.maxX)
+        val minCellY = cellCoord(box.minY)
+        val maxCellY = cellCoord(box.maxY)
 
         val candidates = LinkedHashSet<Feature>()
         for (cx in minCellX..maxCellX) {
@@ -74,26 +79,71 @@ class SpatialIndex(
         val candidates = query(searchBox)
 
         // Test precise geometry:
-        // 1. Point geometries within tolerance distance
-        // 2. Polygon geometries containing point
-        // 3. Polyline geometries with distance <= tolerance
+        // Priority 1: Points (closest to touch)
+        // Priority 2: Polylines (closest to touch)
+        // Priority 3: Polygons (containing point or closest boundary)
+
+        var bestPointFeature: Feature? = null
+        var bestPointDist = Double.MAX_VALUE
+
+        var bestLineFeature: Feature? = null
+        var bestLineDist = Double.MAX_VALUE
+
+        var foundPolygonFeature: Feature? = null
+
         for (f in candidates) {
             when (val geom = f.geometry) {
                 is Point -> {
-                    if (geom.distanceTo(touchPoint) <= toleranceDegrees) return f
+                    val d = geom.distanceTo(touchPoint)
+                    if (d <= toleranceDegrees && d < bestPointDist) {
+                        bestPointDist = d
+                        bestPointFeature = f
+                    }
                 }
-                is Polygon -> {
-                    if (geom.containsPoint(touchPoint)) return f
+                is MultiPoint -> {
+                    for (pt in geom.points) {
+                        val d = pt.distanceTo(touchPoint)
+                        if (d <= toleranceDegrees && d < bestPointDist) {
+                            bestPointDist = d
+                            bestPointFeature = f
+                        }
+                    }
                 }
                 is Polyline -> {
-                    if (distancePointToPolyline(touchPoint, geom.points) <= toleranceDegrees) return f
+                    val d = distancePointToPolyline(touchPoint, geom.points)
+                    if (d <= toleranceDegrees && d < bestLineDist) {
+                        bestLineDist = d
+                        bestLineFeature = f
+                    }
+                }
+                is MultiPolyline -> {
+                    for (line in geom.polylines) {
+                        val d = distancePointToPolyline(touchPoint, line.points)
+                        if (d <= toleranceDegrees && d < bestLineDist) {
+                            bestLineDist = d
+                            bestLineFeature = f
+                        }
+                    }
+                }
+                is Polygon -> {
+                    if (geom.containsPoint(touchPoint) && foundPolygonFeature == null) {
+                        foundPolygonFeature = f
+                    }
+                }
+                is MultiPolygon -> {
+                    if (geom.containsPoint(touchPoint) && foundPolygonFeature == null) {
+                        foundPolygonFeature = f
+                    }
                 }
                 else -> {
-                    if (geom != null && geom.boundingBox.contains(touchPoint)) return f
+                    if (geom != null && geom.boundingBox.contains(touchPoint) && foundPolygonFeature == null) {
+                        foundPolygonFeature = f
+                    }
                 }
             }
         }
-        return null
+
+        return bestPointFeature ?: bestLineFeature ?: foundPolygonFeature
     }
 
     private fun distancePointToPolyline(p: Point, points: List<Point>): Double {
@@ -117,6 +167,6 @@ class SpatialIndex(
         val projY = a.y + t * dy
         val distX = p.x - projX
         val distY = p.y - projY
-        return kotlin.math.sqrt(distX * distX + distY * distY)
+        return sqrt(distX * distX + distY * distY)
     }
 }
