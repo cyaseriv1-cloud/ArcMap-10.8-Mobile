@@ -148,7 +148,10 @@ class MainViewModel : ViewModel() {
     val mapRenderTrigger = MutableStateFlow(0L)
 
     init {
-        loadSampleData()
+        // ⚠️ Iniciamos con mapa VACÍO — el usuario añade capas según necesite.
+        // Los datos de muestra se cargan solo desde Archivo > Cargar muestra (Cusco).
+        _layers.value = emptyList()
+        _statusMessage.value = "Listo · Selecciona un Mapa Base para comenzar"
     }
 
     fun loadSampleData() {
@@ -427,8 +430,17 @@ class MainViewModel : ViewModel() {
     }
 
     fun toggleTheme() {
-        _theme.value = if (_theme.value == ArcMapTheme.LIGHT) ArcMapTheme.DARK else ArcMapTheme.LIGHT
-        _statusMessage.value = if (_theme.value == ArcMapTheme.DARK) "Tema Oscuro activado" else "Tema Claro activado"
+        val newTheme = if (_theme.value == ArcMapTheme.LIGHT) ArcMapTheme.DARK else ArcMapTheme.LIGHT
+        _theme.value = newTheme
+        // Auto-sync mapa base con el tema
+        val currentBm = _currentBasemap.value
+        if (newTheme == ArcMapTheme.DARK &&
+            (currentBm == BasemapType.OPEN_STREET_MAP || currentBm == BasemapType.CARTO_POSITRON)) {
+            _currentBasemap.value = BasemapType.CARTO_DARK
+        } else if (newTheme == ArcMapTheme.LIGHT && currentBm == BasemapType.CARTO_DARK) {
+            _currentBasemap.value = BasemapType.OPEN_STREET_MAP
+        }
+        _statusMessage.value = if (newTheme == ArcMapTheme.DARK) "Tema Oscuro activado" else "Tema Claro activado"
         updateRender()
     }
 
@@ -453,19 +465,61 @@ class MainViewModel : ViewModel() {
         if (gps != null) {
             viewport.centerLon = gps.x
             viewport.centerLat = gps.y
-            viewport.zoom = 16.0 // Escala de calle
+            viewport.zoom = 17.0 // Zoom de calle detallado
             updateCoordinates(viewport.centerLon, viewport.centerLat)
-            _statusMessage.value = "GPS: Centrado en tu ubicación actual"
+            _statusMessage.value = "GPS: Centrado en tu ubicación (±${_gpsAccuracy.value?.toInt() ?: "?"}m)"
             updateRender()
         } else {
-            // Si el GPS aún no tiene fijación satelital, centramos en la zona activa de Cusco
-            viewport.centerLon = -71.9470
-            viewport.centerLat = -13.5385
-            viewport.zoom = 15.5
-            updateCoordinates(viewport.centerLon, viewport.centerLat)
-            _statusMessage.value = "Buscando satélites GPS... (centrado en zona urbana)"
+            _statusMessage.value = "🛰️ Buscando señal GPS... Por favor espera unos segundos"
             updateRender()
         }
+    }
+
+    // Captura el punto GPS actual y lo agrega como entidad a la capa activa
+    fun captureGpsPoint() {
+        val gps = _gpsLocation.value
+        if (gps == null) {
+            _statusMessage.value = "Sin señal GPS todavía. Espera unos segundos."
+            return
+        }
+        val target = _activeLayer.value ?: run {
+            // Si no hay capa activa, crear una automáticamente para puntos de campo
+            val fieldLayer = VectorLayer(
+                name = "Puntos de Campo GPS",
+                geometryType = com.terraaxis.core.geometry.GeometryType.POINT
+            )
+            fieldLayer.fields.addAll(listOf(
+                com.terraaxis.core.model.Field("ID", com.terraaxis.core.model.FieldType.INTEGER),
+                com.terraaxis.core.model.Field("NOMBRE", com.terraaxis.core.model.FieldType.STRING),
+                com.terraaxis.core.model.Field("PRECISION_M", com.terraaxis.core.model.FieldType.DOUBLE),
+                com.terraaxis.core.model.Field("FECHA", com.terraaxis.core.model.FieldType.STRING),
+                com.terraaxis.core.model.Field("LONGITUD", com.terraaxis.core.model.FieldType.DOUBLE),
+                com.terraaxis.core.model.Field("LATITUD", com.terraaxis.core.model.FieldType.DOUBLE)
+            ))
+            val list = _layers.value.toMutableList()
+            list.add(0, fieldLayer)
+            _layers.value = list
+            _activeLayer.value = fieldLayer
+            fieldLayer
+        }
+        if (target.geometryType != com.terraaxis.core.geometry.GeometryType.POINT) {
+            _statusMessage.value = "La capa activa '${target.name}' no es de tipo punto. Selecciona una capa de puntos en el TOC."
+            return
+        }
+        val nextId = (target.features.maxOfOrNull { it.id } ?: 0L) + 1L
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+        val timestamp = sdf.format(java.util.Date())
+        val attrs = mutableMapOf<String, Any?>(
+            "ID" to nextId,
+            "NOMBRE" to "GPS-$nextId",
+            "PRECISION_M" to (_gpsAccuracy.value?.toDouble() ?: 0.0),
+            "FECHA" to timestamp,
+            "LONGITUD" to gps.x,
+            "LATITUD" to gps.y
+        )
+        target.features.add(Feature(nextId, gps, attrs))
+        _statusMessage.value = "✅ Punto GPS-$nextId capturado en '${target.name}' (±${_gpsAccuracy.value?.toInt() ?: "?"}m)"
+        updateRender()
     }
 
     fun searchPlaces(query: String): List<Pair<VectorLayer, Feature>> {
@@ -721,5 +775,68 @@ class MainViewModel : ViewModel() {
 
     fun clearWorldSearchResults() {
         _worldSearchResults.value = emptyList()
+    }
+
+    // ── Limpiar todas las capas ──────────────────────────────────────────────
+    fun clearAllLayers() {
+        _layers.value = emptyList()
+        _activeLayer.value = null
+        _identifiedFeature.value = null
+        _isAttributeTableVisible.value = false
+        _statusMessage.value = if (_language.value == AppLanguage.ES)
+            "✓ Todas las capas eliminadas. Mapa limpio." else "✓ All layers cleared."
+        updateRender()
+    }
+
+    // ── Exportar capa activa a GeoJSON (en Downloads/) ───────────────────────
+    fun exportActiveLayerAsGeoJson() {
+        val layer = _activeLayer.value ?: run {
+            _statusMessage.value = "Sin capa activa para exportar."
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val dir = android.os.Environment.getExternalStoragePublicDirectory(
+                    android.os.Environment.DIRECTORY_DOWNLOADS
+                )
+                dir.mkdirs()
+                val safeName = layer.name.replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
+                val outFile = java.io.File(dir, "$safeName.geojson")
+                val features = layer.features.joinToString(",\n") { feat ->
+                    val geom = feat.geometry
+                    val geomJson = when (geom) {
+                        is Point -> """{"type":"Point","coordinates":[${geom.x},${geom.y}]}"""
+                        is Polyline -> {
+                            val coords = geom.points.joinToString(",") { "[${it.x},${it.y}]" }
+                            """{"type":"LineString","coordinates":[$coords]}"""
+                        }
+                        is Polygon -> {
+                            val ring = geom.rings.firstOrNull() ?: emptyList()
+                            val coords = ring.joinToString(",") { "[${it.x},${it.y}]" }
+                            """{"type":"Polygon","coordinates":[[$coords]]}"""
+                        }
+                        else -> "null"
+                    }
+                    val attrsJson = feat.attributes.entries.joinToString(",") { (k, v) ->
+                        val valStr = when (v) {
+                            is Number -> v.toString()
+                            null -> "null"
+                            else -> "\"${v.toString().replace("\"", "\\\"")}\""
+                        }
+                        "\"$k\":$valStr"
+                    }
+                    """{"type":"Feature","geometry":$geomJson,"properties":{$attrsJson}}"""
+                }
+                val geoJson = """{"type":"FeatureCollection","features":[$features]}"""
+                outFile.writeText(geoJson)
+                withContext(Dispatchers.Main) {
+                    _statusMessage.value = "✓ Exportado: Downloads/${outFile.name} (${layer.features.size} entidades)"
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _statusMessage.value = "Error al exportar: ${e.message}"
+                }
+            }
+        }
     }
 }

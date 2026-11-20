@@ -135,11 +135,12 @@ fun ArcMapClassicTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(menuBarBg)
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 4.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             val menus = if (isEs) {
-                listOf("Archivo", "Edición", "Ver", "Selección", "Geoprocesamiento", "Ventanas")
+                listOf("Archivo", "Edición", "Ver", "Selección", "Geoprocesam.", "Ventanas")
             } else {
                 listOf("File", "Edit", "View", "Selection", "Geoprocessing", "Windows")
             }
@@ -181,13 +182,39 @@ fun ArcMapClassicTopBar(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    text = { Text(if (isEs) "⚡ Capturar Punto GPS Actual" else "⚡ Capture Current GPS Point") },
+                                    leadingIcon = { Icon(Icons.Default.AddLocation, contentDescription = null, tint = Color(0xFF2E7D32)) },
+                                    onClick = {
+                                        activeMenu = null
+                                        viewModel.captureGpsPoint()
+                                    }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
                                     text = { Text(if (isEs) "Cargar Muestra Esri (Cusco)" else "Load Esri Sample Data") },
-                                    leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                                    leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFF607D8B)) },
                                     onClick = {
                                         activeMenu = null
                                         viewModel.loadSampleData()
                                     }
                                 )
+                                DropdownMenuItem(
+                                    text = { Text(if (isEs) "Limpiar todas las capas" else "Clear all layers") },
+                                    leadingIcon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color(0xFFE53935)) },
+                                    onClick = {
+                                        activeMenu = null
+                                        viewModel.clearAllLayers()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (isEs) "📤 Exportar capa como GeoJSON" else "📤 Export layer as GeoJSON") },
+                                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF1565C0)) },
+                                    onClick = {
+                                        activeMenu = null
+                                        viewModel.exportActiveLayerAsGeoJson()
+                                    }
+                                )
+                                HorizontalDivider()
                                 DropdownMenuItem(
                                     text = { Text(if (isEs) "Vista de Composición (Layout)" else "Layout View (Sheet)") },
                                     leadingIcon = { Icon(Icons.Default.Print, contentDescription = null) },
@@ -261,7 +288,7 @@ fun ArcMapClassicTopBar(
                                     }
                                 )
                             }
-                            "Geoprocesamiento", "Geoprocessing" -> {
+                            "Geoprocesam.", "Geoprocessing" -> {
                                 DropdownMenuItem(
                                     text = { Text("ArcToolbox...") },
                                     leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = Color.Red) },

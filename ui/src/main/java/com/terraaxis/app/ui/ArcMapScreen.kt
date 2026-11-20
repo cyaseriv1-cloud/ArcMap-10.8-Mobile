@@ -12,6 +12,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddLocation
+import androidx.compose.material.icons.filled.LocationSearching
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -128,36 +130,64 @@ fun ArcMapScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
+                    val gpsLocation by viewModel.gpsLocation.collectAsState()
+
                     // Measure & Digitize HUD
                     MeasureHud(
                         viewModel = viewModel,
                         modifier = Modifier.align(Alignment.BottomCenter)
                     )
 
-                    // Botón flotante GPS / Mi Ubicación real
-                    FloatingActionButton(
-                        onClick = {
-                            val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                            val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                            if (hasFine || hasCoarse) {
-                                startLocationUpdates(context, locationManager, viewModel)
-                                viewModel.centerOnGps()
-                            } else {
-                                locationPermissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                            }
-                        },
+                    // ── Botones flotantes GPS ──────────────────────────────
+                    Column(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(16.dp),
-                        containerColor = if (theme == ArcMapTheme.DARK) Color(0xFF1E3A5F) else Color(0xFFE8EEF5),
-                        contentColor = Color(0xFF0079C1)
+                            .padding(end = 12.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.End
                     ) {
-                        Icon(Icons.Default.MyLocation, contentDescription = "Mi Ubicación GPS")
+                        // Botón capturar punto GPS (📍 principal de campo)
+                        SmallFloatingActionButton(
+                            onClick = {
+                                val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                if (hasFine || hasCoarse) {
+                                    startLocationUpdates(context, locationManager, viewModel)
+                                    viewModel.captureGpsPoint()
+                                } else {
+                                    locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                }
+                            },
+                            containerColor = if (theme == ArcMapTheme.DARK) Color(0xFF1B3A1A) else Color(0xFFE8F5E9),
+                            contentColor = Color(0xFF2E7D32)
+                        ) {
+                            Icon(Icons.Default.AddLocation, contentDescription = "Capturar punto GPS")
+                        }
+
+                        // Botón centrar en mi ubicación
+                        FloatingActionButton(
+                            onClick = {
+                                val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                if (hasFine || hasCoarse) {
+                                    startLocationUpdates(context, locationManager, viewModel)
+                                    viewModel.centerOnGps()
+                                } else {
+                                    locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                }
+                            },
+                            containerColor = if (gpsLocation != null) {
+                                if (theme == ArcMapTheme.DARK) Color(0xFF0D2B4A) else Color(0xFFE3F2FD)
+                            } else {
+                                if (theme == ArcMapTheme.DARK) Color(0xFF2A2A2A) else Color(0xFFF5F5F5)
+                            },
+                            contentColor = if (gpsLocation != null) Color(0xFF0079C1) else Color(0xFF9E9E9E)
+                        ) {
+                            Icon(
+                                if (gpsLocation != null) Icons.Default.MyLocation else Icons.Default.LocationSearching,
+                                contentDescription = "Mi Ubicación GPS"
+                            )
+                        }
                     }
                 } else {
                     ArcMapLayoutView(
