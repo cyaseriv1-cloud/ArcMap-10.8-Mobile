@@ -392,23 +392,32 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setActiveLayerId(newLayer.id);
       setIsNewLayerDialogVisible(false);
 
-      if (
+      const defaultToolForGeom =
+        geometryType === GeometryType.POINT || geometryType === GeometryType.MULTI_POINT
+          ? MapToolMode.DIGITIZE_POINT
+          : geometryType === GeometryType.POLYLINE ||
+              geometryType === GeometryType.MULTI_POLYLINE
+            ? MapToolMode.DIGITIZE_LINE
+            : MapToolMode.DIGITIZE_POLYGON;
+
+      const resume =
         pendingDigitizeToolAfterCreate &&
         isLayerCompatibleWithTool(pendingDigitizeToolAfterCreate, newLayer)
-      ) {
-        const resume = pendingDigitizeToolAfterCreate;
-        setActiveTool(resume);
-        setDigitizeSession(
-          new DigitizeSession(
-            [],
-            newLayer.id,
-            resume === MapToolMode.DIGITIZE_POLYGON
-          )
-        );
-        setStatusMessage(`Capa '${cleanName}' creada. Listo para digitalizar.`);
-      } else {
-        setStatusMessage(`Capa '${cleanName}' creada (${geometryType})`);
-      }
+          ? pendingDigitizeToolAfterCreate
+          : defaultToolForGeom;
+
+      setIsEditorActive(true);
+      setActiveTool(resume);
+      setDigitizeSession(
+        new DigitizeSession(
+          [],
+          newLayer.id,
+          resume === MapToolMode.DIGITIZE_POLYGON
+        )
+      );
+      setStatusMessage(
+        `Capa '${cleanName}' (${geometryType}) lista. Toca el mapa para dibujar.`
+      );
 
       setPendingDigitizeToolAfterCreate(null);
       updateRender();

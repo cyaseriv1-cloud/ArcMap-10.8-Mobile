@@ -75,30 +75,30 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
         }`}
       >
         {/* TOC Header */}
-        <div className="bg-[#335E8A] text-white px-2.5 py-1.5 rounded-[2px] flex items-center justify-between">
+        <div className="bg-[#335E8A] text-white px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-[2px] flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Layers className="w-4 h-4" />
-            <span className="font-bold text-xs">Table of Contents</span>
+            <span className="font-bold text-[13px] sm:text-xs">Table of Contents</span>
           </div>
           <button
             type="button"
             onClick={() => toggleToc(false)}
-            className="p-0.5 hover:bg-white/20 rounded cursor-pointer"
+            className="p-1.5 sm:p-0.5 hover:bg-white/20 rounded cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
         {/* Classic ArcMap TOC Tabs */}
         <div
-          className={`flex items-center justify-around p-0.5 border mt-1 ${
+          className={`flex items-center justify-around p-1 sm:p-0.5 border mt-1 ${
             isDark ? 'bg-[#21262D] border-[#30363D]' : 'bg-[#EBE9E4] border-[#D0D0D0]'
           }`}
         >
           <button
             type="button"
             onClick={() => setTocTab('order')}
-            className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-[2px] border cursor-pointer ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 sm:px-2 sm:py-0.5 text-xs sm:text-[11px] rounded-[2px] border cursor-pointer ${
               tocTab === 'order'
                 ? isDark
                   ? 'bg-[#1A1F26] border-[#384252] font-bold text-white'
@@ -108,7 +108,7 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
                   : 'border-transparent text-gray-600'
             }`}
           >
-            <List className="w-3.5 h-3.5 text-[#0079C1]" />
+            <List className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#0079C1]" />
             <span>Drawing Order</span>
           </button>
 
@@ -116,7 +116,7 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
             type="button"
             title="List by Source"
             onClick={() => setTocTab('source')}
-            className={`p-1 rounded cursor-pointer ${
+            className={`p-2 sm:p-1 rounded cursor-pointer ${
               tocTab === 'source'
                 ? 'text-[#0079C1]'
                 : isDark
@@ -124,13 +124,13 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
                   : 'text-gray-500'
             }`}
           >
-            <Folder className="w-3.5 h-3.5" />
+            <Folder className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
           </button>
           <button
             type="button"
             title="List by Visibility"
             onClick={() => setTocTab('visibility')}
-            className={`p-1 rounded cursor-pointer ${
+            className={`p-2 sm:p-1 rounded cursor-pointer ${
               tocTab === 'visibility'
                 ? 'text-[#0079C1]'
                 : isDark
@@ -138,13 +138,13 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
                   : 'text-gray-500'
             }`}
           >
-            <Eye className="w-3.5 h-3.5" />
+            <Eye className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
           </button>
           <button
             type="button"
             title="List by Selection"
             onClick={() => setTocTab('selection')}
-            className={`p-1 rounded cursor-pointer ${
+            className={`p-2 sm:p-1 rounded cursor-pointer ${
               tocTab === 'selection'
                 ? 'text-[#0079C1]'
                 : isDark
@@ -152,7 +152,7 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
                   : 'text-gray-500'
             }`}
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
+            <CheckCircle2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
           </button>
         </div>
 
@@ -258,9 +258,9 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
             onClick={() => {
               toggleCatalog(true);
             }}
-            className="flex-1 h-8 bg-[#FFD54F] hover:bg-[#FFCA28] border border-[#B0B0B0] rounded-[3px] flex items-center justify-center gap-1 text-[11px] font-bold text-black cursor-pointer"
+            className="flex-1 h-10 sm:h-8 bg-[#FFD54F] hover:bg-[#FFCA28] border border-[#B0B0B0] rounded-[3px] flex items-center justify-center gap-1 text-xs sm:text-[11px] font-bold text-black cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             <span>Add Data</span>
           </button>
 
@@ -269,13 +269,13 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
             onClick={() => {
               openBasemapDialog();
             }}
-            className={`flex-1 h-8 border rounded-[3px] flex items-center justify-center gap-1 text-[11px] font-bold cursor-pointer ${
+            className={`flex-1 h-10 sm:h-8 border rounded-[3px] flex items-center justify-center gap-1 text-xs sm:text-[11px] font-bold cursor-pointer ${
               isDark
                 ? 'bg-[#1E3A5F] hover:bg-[#254A78] border-[#0079C1] text-[#90CAF9]'
                 : 'bg-[#E3F2FD] hover:bg-[#BBDEFB] border-[#0079C1] text-[#0079C1]'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             <span>{isEs ? 'Mapa Base' : 'Basemap'}</span>
           </button>
 
@@ -283,13 +283,13 @@ export const ArcMapTableOfContentsDrawer: React.FC = () => {
             type="button"
             title={isEs ? 'Nueva Capa' : 'New Layer'}
             onClick={() => openNewLayerDialog()}
-            className={`h-8 px-2 border rounded-[3px] flex items-center justify-center cursor-pointer ${
+            className={`h-10 sm:h-8 px-3 sm:px-2 border rounded-[3px] flex items-center justify-center cursor-pointer ${
               isDark
                 ? 'bg-[#21262D] border-[#384252] text-gray-200 hover:bg-[#30363D]'
                 : 'bg-white border-[#B0B0B0] text-gray-800 hover:bg-gray-100'
             }`}
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
           </button>
         </div>
       </aside>
@@ -370,7 +370,7 @@ const ArcMapLayerTreeItem: React.FC<{
       className={`w-full rounded-[2px] border p-1.5 cursor-pointer transition-colors ${itemBg}`}
     >
       {/* Row 1: Checkbox + Name + Quick Actions */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2 sm:gap-1.5">
         <input
           type="checkbox"
           checked={layer.isVisible}
@@ -379,14 +379,14 @@ const ArcMapLayerTreeItem: React.FC<{
             onToggleVisibility();
           }}
           onClick={(e) => e.stopPropagation()}
-          className="w-3.5 h-3.5 accent-[#0079C1] cursor-pointer shrink-0"
+          className="w-5 h-5 sm:w-3.5 sm:h-3.5 accent-[#0079C1] cursor-pointer shrink-0"
         />
 
         <div className="flex-1 min-w-0">
-          <div className={`text-xs truncate ${isActive ? 'font-bold' : 'font-medium'}`}>
+          <div className={`text-[13px] sm:text-xs truncate ${isActive ? 'font-bold' : 'font-medium'}`}>
             {layer.name}
           </div>
-          <div className="text-[10px] opacity-65 truncate">
+          <div className="text-[11px] sm:text-[10px] opacity-65 truncate">
             {layer.features.length} feat · {layer.geometryType}
             {layer.selectedFeatureIds.size > 0
               ? ` · ${layer.selectedFeatureIds.size} sel`
@@ -399,42 +399,42 @@ const ArcMapLayerTreeItem: React.FC<{
             type="button"
             title={isEs ? 'Tabla de Atributos' : 'Attribute Table'}
             onClick={onOpenTable}
-            className={`p-1 rounded cursor-pointer ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+            className={`p-2 sm:p-1 rounded cursor-pointer ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
           >
-            <Table2 className="w-3.5 h-3.5 text-[#0079C1]" />
+            <Table2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#0079C1]" />
           </button>
           <button
             type="button"
             title={isEs ? 'Simbología / Propiedades' : 'Symbology / Properties'}
             onClick={onOpenProperties}
-            className={`p-1 rounded cursor-pointer ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+            className={`p-2 sm:p-1 rounded cursor-pointer ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
           >
-            <Palette className="w-3.5 h-3.5 text-[#AB47BC]" />
+            <Palette className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#AB47BC]" />
           </button>
           <button
             type="button"
             title={isEs ? 'Zoom a Capa' : 'Zoom to Layer'}
             onClick={onZoomToLayer}
-            className={`p-1 rounded cursor-pointer ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+            className={`p-2 sm:p-1 rounded cursor-pointer ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
           >
-            <Crosshair className="w-3.5 h-3.5 text-[#4CAF50]" />
+            <Crosshair className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#4CAF50]" />
           </button>
           <button
             type="button"
             title={isEs ? 'Eliminar' : 'Remove'}
             onClick={onDelete}
-            className={`p-1 rounded cursor-pointer ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+            className={`p-2 sm:p-1 rounded cursor-pointer ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
           >
-            <Trash2 className="w-3.5 h-3.5 text-[#EF5350]" />
+            <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#EF5350]" />
           </button>
         </div>
       </div>
 
       {/* Row 2: Indented Symbol Swatch + Legend Description + Order/Opacity Toggle */}
-      <div className="pl-5 pt-1 flex items-center justify-between gap-1.5">
+      <div className="pl-7 sm:pl-5 pt-1 flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <ArcMapSymbolSwatch layer={layer} />
-          <span className="text-[10px] opacity-75 truncate">{legendText}</span>
+          <span className="text-[11px] sm:text-[10px] opacity-75 truncate">{legendText}</span>
         </div>
 
         <button
@@ -443,7 +443,7 @@ const ArcMapLayerTreeItem: React.FC<{
             e.stopPropagation();
             setExpanded((v) => !v);
           }}
-          className="text-[10px] opacity-65 hover:opacity-100 px-1 cursor-pointer shrink-0"
+          className="text-xs sm:text-[10px] opacity-65 hover:opacity-100 px-2.5 py-1 sm:px-1 sm:py-0 cursor-pointer shrink-0"
         >
           {expanded ? '▲' : '▼'}
         </button>

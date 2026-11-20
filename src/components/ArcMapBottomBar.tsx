@@ -33,13 +33,13 @@ export const ArcMapBottomBar: React.FC = () => {
     >
       {/* Classic Data View / Layout View / Refresh Switcher */}
       <div
-        className={`flex items-center ${switchBg} border ${borderCol} rounded-[2px] p-0.5 gap-0.5 shrink-0`}
+        className={`flex items-center ${switchBg} border ${borderCol} rounded-[3px] p-0.5 gap-1 sm:gap-0.5 shrink-0`}
       >
         <button
           type="button"
           title="Data View"
           onClick={() => setViewMode(ArcMapViewMode.DATA_VIEW)}
-          className={`w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] border cursor-pointer ${
+          className={`w-9 h-9 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] border cursor-pointer ${
             viewMode === ArcMapViewMode.DATA_VIEW
               ? isDark
                 ? 'bg-[#1E3A5F] border-[#0079C1] text-[#64B5F6]'
@@ -47,14 +47,14 @@ export const ArcMapBottomBar: React.FC = () => {
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          <Globe className="w-3.5 h-3.5" />
+          <Globe className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
         </button>
 
         <button
           type="button"
           title="Layout View"
           onClick={() => setViewMode(ArcMapViewMode.LAYOUT_VIEW)}
-          className={`w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] border cursor-pointer ${
+          className={`w-9 h-9 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] border cursor-pointer ${
             viewMode === ArcMapViewMode.LAYOUT_VIEW
               ? isDark
                 ? 'bg-[#1E3A5F] border-[#0079C1] text-[#64B5F6]'
@@ -62,18 +62,18 @@ export const ArcMapBottomBar: React.FC = () => {
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          <Printer className="w-3.5 h-3.5" />
+          <Printer className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
         </button>
 
         <button
           type="button"
           title="Refresh"
           onClick={updateRender}
-          className={`w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] cursor-pointer ${
+          className={`w-9 h-9 sm:w-6 sm:h-6 flex items-center justify-center rounded-[2px] cursor-pointer ${
             isDark ? 'text-gray-300 hover:bg-[#30363D]' : 'text-gray-700 hover:bg-white/60'
           }`}
         >
-          <RefreshCw className="w-3.5 h-3.5" />
+          <RefreshCw className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
         </button>
       </div>
 

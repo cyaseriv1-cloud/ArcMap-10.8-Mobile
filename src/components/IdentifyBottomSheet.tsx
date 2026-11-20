@@ -124,59 +124,59 @@ export const IdentifyBottomSheet: React.FC = () => {
           <button
             type="button"
             onClick={dismissIdentify}
-            className="p-1 rounded hover:bg-black/10 cursor-pointer"
+            className="p-2 sm:p-1 rounded hover:bg-black/10 cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5 sm:w-4 sm:h-4" />
           </button>
         </div>
 
         {/* Actions */}
-        <div className="px-4 py-2 grid grid-cols-3 gap-1.5">
+        <div className="px-4 py-2 grid grid-cols-3 gap-2 sm:gap-1.5">
           <button
             type="button"
             onClick={() => selectFeatureInLayer(layer.id, feature.id, false)}
-            className="py-1.5 px-2 rounded bg-[#0079C1] hover:bg-[#00639E] text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
+            className="py-2.5 sm:py-1.5 px-2 rounded bg-[#0079C1] hover:bg-[#00639E] text-white text-[13px] sm:text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
           >
-            <MousePointerClick className="w-3.5 h-3.5 shrink-0" />
+            <MousePointerClick className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
             <span className="truncate">{isEs ? 'Seleccionar' : 'Select'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => zoomToFeature(feature)}
-            className={`py-1.5 px-2 rounded border text-xs font-bold flex items-center justify-center gap-1 cursor-pointer ${
+            className={`py-2.5 sm:py-1.5 px-2 rounded border text-[13px] sm:text-xs font-bold flex items-center justify-center gap-1 cursor-pointer ${
               isDark
                 ? 'border-[#384252] hover:bg-[#282E3A]'
                 : 'border-slate-300 hover:bg-slate-100'
             }`}
           >
-            <Crosshair className="w-3.5 h-3.5 shrink-0" />
+            <Crosshair className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
             <span className="truncate">{isEs ? 'Centrar' : 'Center'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => deleteFeature(layer.id, feature.id)}
-            className="py-1.5 px-2 rounded border border-[#D32F2F]/50 text-[#D32F2F] hover:bg-[#D32F2F]/10 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
+            className="py-2.5 sm:py-1.5 px-2 rounded border border-[#D32F2F]/50 text-[#D32F2F] hover:bg-[#D32F2F]/10 text-[13px] sm:text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
           >
-            <Trash2 className="w-3.5 h-3.5 shrink-0" />
+            <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
             <span className="truncate">{isEs ? 'Eliminar' : 'Delete'}</span>
           </button>
         </div>
 
         {/* Attributes Header */}
-        <div className="px-4 py-1 flex items-center justify-between gap-2">
+        <div className="px-4 py-1.5 sm:py-1 flex items-center justify-between gap-2">
           <span className="text-xs font-bold opacity-75">
             {isEs ? 'Atributos:' : 'Attributes:'}
           </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 sm:gap-1.5">
             <button
               type="button"
               onClick={() => setShowAddField((v) => !v)}
-              className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#0079C1]/15 text-[#0079C1] hover:bg-[#0079C1]/25 cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 sm:px-2 sm:py-0.5 rounded text-xs sm:text-[11px] font-semibold bg-[#0079C1]/15 text-[#0079C1] hover:bg-[#0079C1]/25 cursor-pointer"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
               <span>{isEs ? 'Campo' : 'Field'}</span>
             </button>
 
@@ -184,22 +184,22 @@ export const IdentifyBottomSheet: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSaveEdits}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#2E7D32] text-white cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 sm:px-2 sm:py-0.5 rounded text-xs sm:text-[11px] font-semibold bg-[#2E7D32] text-white cursor-pointer"
               >
-                <Check className="w-3 h-3" />
+                <Check className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                 <span>{isEs ? 'Guardar' : 'Save'}</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1.5 sm:px-2 sm:py-0.5 rounded text-xs sm:text-[11px] font-semibold border cursor-pointer ${
                   isDark
                     ? 'border-[#384252] hover:bg-[#282E3A]'
                     : 'border-slate-300 hover:bg-slate-100'
                 }`}
               >
-                <Edit3 className="w-3 h-3" />
+                <Edit3 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                 <span>{isEs ? 'Editar' : 'Edit'}</span>
               </button>
             )}

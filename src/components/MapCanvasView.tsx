@@ -297,7 +297,7 @@ export const MapCanvasView: React.FC = () => {
       <MeasureHud />
 
       {/* Floating Right Controls: Thumb Zoom + GPS Actions */}
-      <div className="absolute right-3 bottom-3 flex flex-col items-end gap-2 z-10">
+      <div className="absolute right-3 bottom-3 flex flex-col items-end gap-2.5 z-10">
         {/* Compact Zoom & Extent Control Stack */}
         <div
           className={`flex flex-col rounded-xl shadow-md border overflow-hidden ${
@@ -310,31 +310,31 @@ export const MapCanvasView: React.FC = () => {
             type="button"
             onClick={zoomIn}
             title="Zoom In"
-            className={`w-10 h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
+            className={`w-12 h-11 sm:w-10 sm:h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
               isDark ? 'hover:bg-white/10 border-b border-[#384252]' : 'hover:bg-slate-100 border-b border-slate-200'
             }`}
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
           </button>
           <button
             type="button"
             onClick={zoomOut}
             title="Zoom Out"
-            className={`w-10 h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
+            className={`w-12 h-11 sm:w-10 sm:h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
               isDark ? 'hover:bg-white/10 border-b border-[#384252]' : 'hover:bg-slate-100 border-b border-slate-200'
             }`}
           >
-            <Minus className="w-4 h-4" />
+            <Minus className="w-5 h-5 sm:w-4 sm:h-4" />
           </button>
           <button
             type="button"
             onClick={zoomFullExtent}
             title="Full Extent"
-            className={`w-10 h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
+            className={`w-12 h-11 sm:w-10 sm:h-9 flex items-center justify-center cursor-pointer active:scale-95 ${
               isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
-            <Maximize2 className="w-3.5 h-3.5 text-[#0079C1]" />
+            <Maximize2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#0079C1]" />
           </button>
         </div>
 
@@ -342,7 +342,7 @@ export const MapCanvasView: React.FC = () => {
           type="button"
           onClick={requestGpsAndCapture}
           title="Capturar punto GPS"
-          className={`w-10 h-10 rounded-xl shadow-md flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${
+          className={`w-12 h-12 sm:w-10 sm:h-10 rounded-xl shadow-md flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${
             isDark
               ? 'bg-[#1B3A1A] text-[#66BB6A] border border-[#2E7D32]/50'
               : 'bg-[#E8F5E9] text-[#2E7D32] border border-[#A5D6A7]'
@@ -355,7 +355,7 @@ export const MapCanvasView: React.FC = () => {
           type="button"
           onClick={requestGpsAndCenter}
           title="Mi Ubicación GPS"
-          className={`w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${
+          className={`w-14 h-14 sm:w-12 sm:h-12 rounded-2xl shadow-lg flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${
             gpsLocation
               ? isDark
                 ? 'bg-[#0D2B4A] text-[#0079C1] border border-[#0079C1]/50'
