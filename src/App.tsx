@@ -48,23 +48,67 @@ const ArcMapWorkspace: React.FC = () => {
   } = useArcMap();
 
   useEffect(() => {
+    const handleBackOrEscape = (): boolean => {
+      if (pendingFeatureDraft) {
+        cancelPendingFeature();
+        return true;
+      }
+      if (isNewLayerDialogVisible) {
+        closeNewLayerDialog();
+        return true;
+      }
+      if (isBasemapDialogVisible) {
+        closeBasemapDialog();
+        return true;
+      }
+      if (identifiedFeature) {
+        dismissIdentify();
+        return true;
+      }
+      if (isSearchVisible) {
+        toggleSearch(false);
+        return true;
+      }
+      if (isCatalogVisible) {
+        toggleCatalog(false);
+        return true;
+      }
+      if (isAttributeTableVisible) {
+        closeAttributeTable();
+        return true;
+      }
+      if (isToolboxVisible) {
+        toggleToolbox(false);
+        return true;
+      }
+      if (isTocVisible) {
+        toggleToc(false);
+        return true;
+      }
+      if (viewMode !== ArcMapViewMode.DATA_VIEW) {
+        setViewMode(ArcMapViewMode.DATA_VIEW);
+        return true;
+      }
+      if (activeTool !== MapToolMode.PAN) {
+        setTool(MapToolMode.PAN);
+        return true;
+      }
+      return false;
+    };
+
+    window.__arcmapHandleBack = handleBackOrEscape;
+
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (pendingFeatureDraft) cancelPendingFeature();
-      else if (isNewLayerDialogVisible) closeNewLayerDialog();
-      else if (isBasemapDialogVisible) closeBasemapDialog();
-      else if (identifiedFeature) dismissIdentify();
-      else if (isSearchVisible) toggleSearch(false);
-      else if (isCatalogVisible) toggleCatalog(false);
-      else if (isAttributeTableVisible) closeAttributeTable();
-      else if (isToolboxVisible) toggleToolbox(false);
-      else if (isTocVisible) toggleToc(false);
-      else if (viewMode !== ArcMapViewMode.DATA_VIEW) setViewMode(ArcMapViewMode.DATA_VIEW);
-      else if (activeTool !== MapToolMode.PAN) setTool(MapToolMode.PAN);
+      if (e.key === 'Escape') {
+        handleBackOrEscape();
+      }
     };
 
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      delete window.__arcmapHandleBack;
+    };
   }, [
     activeTool,
     cancelPendingFeature,
@@ -94,7 +138,7 @@ const ArcMapWorkspace: React.FC = () => {
 
   return (
     <div
-      className={`h-screen w-screen flex flex-col overflow-hidden ${
+      className={`h-[100dvh] w-screen flex flex-col overflow-hidden ${
         isDark ? 'dark bg-[#0D1117] text-[#E6EDF3]' : 'bg-[#ECEBE6] text-black'
       }`}
     >

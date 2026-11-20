@@ -1,6 +1,7 @@
 export enum BasemapId {
   NONE = 'none',
   OPEN_STREET_MAP = 'osm_standard',
+  ESRI_STREETS = 'esri_streets',
   ESRI_IMAGERY = 'esri_satellite',
   CARTO_DARK = 'carto_dark',
   CARTO_POSITRON = 'carto_positron',
@@ -14,6 +15,7 @@ export interface BasemapDefinition {
   descriptionEs: string;
   descriptionEn: string;
   tileUrlTemplate: string;
+  overlayUrlTemplate?: string;
   minZoom: number;
   maxZoom: number;
   attribution: string;
@@ -43,6 +45,18 @@ export const BASEMAPS: BasemapDefinition[] = [
     attribution: '© OpenStreetMap contributors',
   },
   {
+    id: BasemapId.ESRI_STREETS,
+    titleEs: 'Esri World Street Map (ArcGIS)',
+    titleEn: 'Esri World Street Map (ArcGIS)',
+    descriptionEs: 'Mapa oficial de calles y vías de ArcGIS Online sin clave API',
+    descriptionEn: 'Official ArcGIS Online street and highway basemap',
+    tileUrlTemplate:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    minZoom: 1,
+    maxZoom: 19,
+    attribution: 'Esri, HERE, Garmin, © OpenStreetMap',
+  },
+  {
     id: BasemapId.ESRI_IMAGERY,
     titleEs: 'Imágenes Satelitales (Esri)',
     titleEn: 'Satellite Imagery (Esri)',
@@ -56,25 +70,31 @@ export const BASEMAPS: BasemapDefinition[] = [
   },
   {
     id: BasemapId.CARTO_DARK,
-    titleEs: 'CartoDB Dark Matter (Modo Oscuro)',
-    titleEn: 'CartoDB Dark Matter (Dark)',
-    descriptionEs: 'Mapa base urbano oscuro de alto contraste para análisis nocturno',
-    descriptionEn: 'High-contrast dark urban basemap',
-    tileUrlTemplate: 'https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
+    titleEs: 'Esri Dark Gray Canvas (Modo Oscuro)',
+    titleEn: 'Esri Dark Gray Canvas (Dark)',
+    descriptionEs: 'Mapa base oscuro oficial de ArcGIS para alto contraste nocturno',
+    descriptionEn: 'Official ArcGIS dark gray canvas basemap for night mode',
+    tileUrlTemplate:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    overlayUrlTemplate:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
     minZoom: 1,
-    maxZoom: 19,
-    attribution: '© CARTO, © OpenStreetMap contributors',
+    maxZoom: 16,
+    attribution: 'Esri, HERE, Garmin, © OpenStreetMap',
   },
   {
     id: BasemapId.CARTO_POSITRON,
-    titleEs: 'CartoDB Positron (Gris Cartográfico)',
-    titleEn: 'CartoDB Positron (Light)',
-    descriptionEs: 'Mapa base claro minimalista para resaltar capas SIG',
-    descriptionEn: 'Minimalist light basemap for GIS layer overlay',
-    tileUrlTemplate: 'https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png',
+    titleEs: 'Esri Light Gray Canvas (Gris Cartográfico)',
+    titleEn: 'Esri Light Gray Canvas (Light)',
+    descriptionEs: 'Mapa base claro minimalista de ArcGIS para resaltar capas SIG',
+    descriptionEn: 'Minimalist ArcGIS light gray canvas for GIS layer overlay',
+    tileUrlTemplate:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    overlayUrlTemplate:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
     minZoom: 1,
-    maxZoom: 19,
-    attribution: '© CARTO, © OpenStreetMap contributors',
+    maxZoom: 16,
+    attribution: 'Esri, HERE, Garmin, © OpenStreetMap',
   },
   {
     id: BasemapId.OPEN_TOPO,

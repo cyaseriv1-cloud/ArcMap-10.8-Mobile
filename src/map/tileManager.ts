@@ -1,18 +1,27 @@
 import { BasemapId, type BasemapDefinition } from './basemap';
 
+const RETRY_DELAY_MS = 8000;
+
 export class TileManager {
-  private readonly maxCacheSize = 350;
+  private readonly maxCacheSize = 420;
   private readonly memoryCache = new Map<string, HTMLImageElement>();
   private readonly inFlight = new Set<string>();
-  private readonly failed = new Set<string>();
+  private readonly failedAt = new Map<string, number>();
 
   public onTileLoaded: (() => void) | null = null;
 
-  getTile(basemap: BasemapDefinition, z: number, x: number, y: number): HTMLImageElement | null {
-    if (basemap.id === BasemapId.NONE || !basemap.tileUrlTemplate) return null;
+  getTile(
+    basemap: BasemapDefinition,
+    z: number,
+    x: number,
+    y: number,
+    isOverlay = false
+  ): HTMLImageElement | null {
+    const template = isOverlay ? basemap.overlayUrlTemplate : basemap.tileUrlTemplate;
+    if (basemap.id === BasemapId.NONE || !template) return null;
     if (z < basemap.minZoom || z > basemap.maxZoom) return null;
 
-    const key = `${basemap.id}_${z}_${x}_${y}`;
+    const key = `${basemap.id}_${isOverlay ? 'ov' : 'base'}_${z}_${x}_${y}`;
     const cached = this.memoryCache.get(key);
     if (cached) {
       // Refresh LRU order
@@ -21,24 +30,30 @@ export class TileManager {
       return cached;
     }
 
-    if (this.inFlight.has(key) || this.failed.has(key)) {
+    if (this.inFlight.has(key)) {
+      return null;
+    }
+
+    const lastFail = this.failedAt.get(key);
+    if (lastFail !== undefined && Date.now() - lastFail < RETRY_DELAY_MS) {
       return null;
     }
 
     this.inFlight.add(key);
-    this.loadTile(basemap, z, x, y, key, true);
+    this.failedAt.delete(key);
+    this.loadTile(template, z, x, y, key, true);
     return null;
   }
 
   private loadTile(
-    basemap: BasemapDefinition,
+    template: string,
     z: number,
     x: number,
     y: number,
     key: string,
     tryCors: boolean
   ): void {
-    const url = basemap.tileUrlTemplate
+    const url = template
       .replace('{z}', String(z))
       .replace('{x}', String(x))
       .replace('{y}', String(y));
@@ -50,6 +65,7 @@ export class TileManager {
 
     img.onload = () => {
       this.inFlight.delete(key);
+      this.failedAt.delete(key);
       if (this.memoryCache.size >= this.maxCacheSize) {
         const oldestKey = this.memoryCache.keys().next().value;
         if (oldestKey !== undefined) {
@@ -63,10 +79,10 @@ export class TileManager {
     img.onerror = () => {
       if (tryCors) {
         // Retry without crossOrigin if the tile server omits CORS headers
-        this.loadTile(basemap, z, x, y, key, false);
+        this.loadTile(template, z, x, y, key, false);
       } else {
         this.inFlight.delete(key);
-        this.failed.add(key);
+        this.failedAt.set(key, Date.now());
       }
     };
 
@@ -75,6 +91,6 @@ export class TileManager {
 
   clearMemory(): void {
     this.memoryCache.clear();
-    this.failed.clear();
+    this.failedAt.clear();
   }
 }

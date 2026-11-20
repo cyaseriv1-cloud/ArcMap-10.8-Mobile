@@ -33,8 +33,14 @@ export const FeatureAttributesDialog: React.FC = () => {
         ? targetLayer.fields
         : [makeField('ID', FieldType.INTEGER), makeField('NOMBRE', FieldType.STRING)];
 
+    const prefill = pendingFeatureDraft.prefillAttributes ?? {};
     for (const f of fieldsToUse) {
-      if (f.name.toUpperCase() === 'ID') {
+      const prefillEntry = Object.entries(prefill).find(
+        ([k]) => k.toLowerCase() === f.name.toLowerCase()
+      );
+      if (prefillEntry && prefillEntry[1] !== undefined && prefillEntry[1] !== null) {
+        init[f.name] = String(prefillEntry[1]);
+      } else if (f.name.toUpperCase() === 'ID') {
         init[f.name] = String(pendingFeatureDraft.nextId);
       } else if (f.name.toUpperCase() === 'NOMBRE') {
         init[f.name] = `Entidad ${pendingFeatureDraft.nextId}`;

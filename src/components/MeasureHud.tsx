@@ -33,7 +33,7 @@ export const MeasureHud: React.FC = () => {
     : 'bg-white border-[#CBD5E1] text-[#1E293B]';
 
   return (
-    <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-10 w-[min(360px,calc(100%-130px))]">
+    <div className="absolute bottom-14 left-3 right-16 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 sm:w-[340px]">
       <div className={`rounded-lg border shadow-xl p-3 flex flex-col gap-2 ${cardBg}`}>
         {isMeasuring && (
           <>

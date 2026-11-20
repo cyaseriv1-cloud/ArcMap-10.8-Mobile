@@ -25,11 +25,11 @@ export const ArcMapBottomBar: React.FC = () => {
   const lat = viewport.centerLat;
   const lonDir = lon >= 0 ? 'E' : 'W';
   const latDir = lat >= 0 ? 'N' : 'S';
-  const coordText = `${Math.abs(lon).toFixed(4)}°${lonDir}  ${Math.abs(lat).toFixed(4)}°${latDir}`;
+  const coordText = `${Math.abs(lon).toFixed(4)}°${lonDir} ${Math.abs(lat).toFixed(4)}°${latDir}`;
 
   return (
     <footer
-      className={`w-full ${barBg} border-t ${borderCol} px-1.5 py-0.5 flex items-center gap-2 text-[11px] select-none z-20`}
+      className={`w-full ${barBg} border-t ${borderCol} px-1.5 py-0.5 flex items-center gap-2 text-[10px] sm:text-[11px] select-none z-20`}
     >
       {/* Classic Data View / Layout View / Refresh Switcher */}
       <div
@@ -77,37 +77,44 @@ export const ArcMapBottomBar: React.FC = () => {
         </button>
       </div>
 
-      {/* Status + WGS84 + UTM + Scale */}
-      <div className="flex-1 flex items-center gap-2 overflow-x-auto whitespace-nowrap">
-        <span className={`font-medium truncate max-w-[360px] ${textColor}`}>
-          {statusMessage || 'Listo'}
-        </span>
+      {/* Responsive Status + WGS84 + UTM + Scale (prevents UTM/scale from clipping off mobile screens) */}
+      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 leading-tight">
+        <div className="flex items-center justify-between gap-2 min-w-0 sm:flex-1">
+          <span className={`font-medium truncate ${textColor}`}>
+            {statusMessage || 'Listo'}
+          </span>
+          <span className={`font-bold font-mono tabular-nums shrink-0 sm:hidden ${textColor}`}>
+            1:{mapScale.toLocaleString('en-US')}
+          </span>
+        </div>
 
-        <span className="text-gray-400">|</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto whitespace-nowrap shrink-0">
+          <span className="hidden sm:inline text-gray-400">|</span>
 
-        <span
-          className={`font-mono tabular-nums ${
-            isDark ? 'text-[#4DD0E1]' : 'text-[#004D40]'
-          }`}
-        >
-          {coordText}
-        </span>
+          <span
+            className={`font-mono tabular-nums ${
+              isDark ? 'text-[#4DD0E1]' : 'text-[#004D40]'
+            }`}
+          >
+            {coordText}
+          </span>
 
-        <span className="text-gray-400">|</span>
+          <span className="text-gray-400">|</span>
 
-        <span
-          className={`font-mono tabular-nums ${
-            isDark ? 'text-[#90CAF9]' : 'text-[#1A237E]'
-          }`}
-        >
-          UTM: {formatUtm(cursorUtm)}
-        </span>
+          <span
+            className={`font-mono tabular-nums ${
+              isDark ? 'text-[#90CAF9]' : 'text-[#1A237E]'
+            }`}
+          >
+            UTM: {formatUtm(cursorUtm)}
+          </span>
 
-        <span className="text-gray-400">|</span>
+          <span className="hidden sm:inline text-gray-400">|</span>
 
-        <span className={`font-bold font-mono tabular-nums ${textColor}`}>
-          1: {mapScale.toLocaleString('en-US')}
-        </span>
+          <span className={`hidden sm:inline font-bold font-mono tabular-nums ${textColor}`}>
+            1: {mapScale.toLocaleString('en-US')}
+          </span>
+        </div>
       </div>
     </footer>
   );

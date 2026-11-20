@@ -411,7 +411,7 @@ export const AttributeTableSheet: React.FC = () => {
                                     val === null || val === undefined ? '' : String(val)
                                   );
                                 }}
-                                className="opacity-0 group-hover:opacity-70 hover:!opacity-100 p-0.5 cursor-pointer"
+                                className="opacity-65 sm:opacity-0 sm:group-hover:opacity-75 hover:!opacity-100 p-1 -mr-1 cursor-pointer shrink-0"
                               >
                                 <Edit3 className="w-3 h-3" />
                               </button>

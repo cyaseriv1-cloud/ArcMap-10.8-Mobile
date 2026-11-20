@@ -59,6 +59,8 @@ export const MapCanvasView: React.FC = () => {
     lastCenterY: 0,
   });
 
+  const lastTouchTimeRef = useRef<number>(0);
+
   // Render canvas whenever state or dimensions change
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -137,6 +139,7 @@ export const MapCanvasView: React.FC = () => {
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (Date.now() - lastTouchTimeRef.current < 650) return;
     const [x, y] = getLocalCoords(e.clientX, e.clientY);
     dragStateRef.current = {
       isDown: true,
@@ -149,6 +152,7 @@ export const MapCanvasView: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (Date.now() - lastTouchTimeRef.current < 650) return;
     const [x, y] = getLocalCoords(e.clientX, e.clientY);
     if (dragStateRef.current.isDown) {
       const dx = x - dragStateRef.current.lastX;
@@ -169,6 +173,7 @@ export const MapCanvasView: React.FC = () => {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (Date.now() - lastTouchTimeRef.current < 650) return;
     if (!dragStateRef.current.isDown) return;
     const moved = dragStateRef.current.movedDistance;
     dragStateRef.current.isDown = false;
@@ -186,6 +191,7 @@ export const MapCanvasView: React.FC = () => {
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    lastTouchTimeRef.current = Date.now();
     if (e.touches.length === 1) {
       const [x, y] = getLocalCoords(e.touches[0].clientX, e.touches[0].clientY);
       dragStateRef.current = {
@@ -211,6 +217,7 @@ export const MapCanvasView: React.FC = () => {
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    lastTouchTimeRef.current = Date.now();
     if (e.touches.length === 1 && dragStateRef.current.isDown) {
       const [x, y] = getLocalCoords(e.touches[0].clientX, e.touches[0].clientY);
       const dx = x - dragStateRef.current.lastX;
@@ -249,6 +256,7 @@ export const MapCanvasView: React.FC = () => {
   };
 
   const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    lastTouchTimeRef.current = Date.now();
     if (e.touches.length === 0) {
       if (dragStateRef.current.isDown && dragStateRef.current.movedDistance < 8) {
         handleMapTap(dragStateRef.current.startX, dragStateRef.current.startY);

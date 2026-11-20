@@ -163,7 +163,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveMenu((prev) => (prev === m.key ? null : m.key))}
-              className={`px-2 py-0.5 text-xs rounded-[2px] cursor-pointer whitespace-nowrap ${textColor} ${
+              className={`px-1.5 sm:px-2 py-0.5 text-[11px] sm:text-xs rounded-[2px] cursor-pointer whitespace-nowrap ${textColor} ${
                 activeMenu === m.key
                   ? isDark
                     ? 'bg-[#30363D] font-bold'
@@ -444,7 +444,7 @@ export const ArcMapClassicTopBar: React.FC = () => {
       </div>
 
       {/* 3. Standard & Tools Toolbar */}
-      <div className="w-full px-1.5 py-1 flex items-center gap-1 overflow-x-auto">
+      <div className="w-full px-1.5 py-1 flex items-center flex-wrap gap-1">
         {/* Classic Add Data (+) */}
         <button
           type="button"

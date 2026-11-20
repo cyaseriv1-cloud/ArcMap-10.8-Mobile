@@ -110,8 +110,8 @@ function bufferPolyline(polyline: Polyline, distanceMeters: number): Polygon | n
 
   const latAvg = pts.reduce((s, p) => s + p.y, 0) / pts.length;
   const latRad = (latAvg * Math.PI) / 180.0;
-  const degLat = distanceMeters / 111320.0;
-  const degLon = distanceMeters / (111320.0 * Math.max(0.001, Math.cos(latRad)));
+  const mPerDegLat = 111320.0;
+  const mPerDegLon = 111320.0 * Math.max(0.001, Math.cos(latRad));
 
   const leftSide: Point[] = [];
   const rightSide: Point[] = [];
@@ -119,18 +119,20 @@ function bufferPolyline(polyline: Polyline, distanceMeters: number): Polygon | n
   for (let i = 0; i < pts.length - 1; i++) {
     const p1 = pts[i];
     const p2 = pts[i + 1];
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 1e-9) continue;
+    const dxMeters = (p2.x - p1.x) * mPerDegLon;
+    const dyMeters = (p2.y - p1.y) * mPerDegLat;
+    const lenMeters = Math.sqrt(dxMeters * dxMeters + dyMeters * dyMeters);
+    if (lenMeters < 1e-6) continue;
 
-    const nx = (-dy / len) * degLon;
-    const ny = (dx / len) * degLat;
+    const nxMeters = (-dyMeters / lenMeters) * distanceMeters;
+    const nyMeters = (dxMeters / lenMeters) * distanceMeters;
+    const nxDeg = nxMeters / mPerDegLon;
+    const nyDeg = nyMeters / mPerDegLat;
 
-    leftSide.push(makePoint(p1.x + nx, p1.y + ny));
-    leftSide.push(makePoint(p2.x + nx, p2.y + ny));
-    rightSide.push(makePoint(p1.x - nx, p1.y - ny));
-    rightSide.push(makePoint(p2.x - nx, p2.y - ny));
+    leftSide.push(makePoint(p1.x + nxDeg, p1.y + nyDeg));
+    leftSide.push(makePoint(p2.x + nxDeg, p2.y + nyDeg));
+    rightSide.push(makePoint(p1.x - nxDeg, p1.y - nyDeg));
+    rightSide.push(makePoint(p2.x - nxDeg, p2.y - nyDeg));
   }
 
   if (leftSide.length === 0) return null;

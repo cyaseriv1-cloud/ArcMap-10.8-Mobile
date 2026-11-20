@@ -17,6 +17,8 @@ function getBasemapBadgeStyle(id: BasemapId): { bg: string; icon: React.ReactNod
   switch (id) {
     case BasemapId.ESRI_IMAGERY:
       return { bg: '#1B5E20', icon: <Satellite className="w-5 h-5 text-white" /> };
+    case BasemapId.ESRI_STREETS:
+      return { bg: '#0079C1', icon: <MapIcon className="w-5 h-5 text-white" /> };
     case BasemapId.OPEN_STREET_MAP:
       return { bg: '#0277BD', icon: <MapIcon className="w-5 h-5 text-white" /> };
     case BasemapId.CARTO_DARK:

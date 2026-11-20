@@ -190,6 +190,30 @@ function buildShpRecordContent(geom: Geometry | null, shapeType: number): Uint8A
     return new Uint8Array(buf);
   }
 
+  if (shapeType === 8 && geom.geometryType === GeometryType.MULTI_POINT) {
+    const pts = geom.points;
+    const box = getGeometryBoundingBox(geom);
+    const totalSize = 4 + 32 + 4 + pts.length * 16;
+    const buf = new ArrayBuffer(totalSize);
+    const view = new DataView(buf);
+    let pos = 0;
+    view.setInt32(pos, 8, true);
+    pos += 4;
+    view.setFloat64(pos, box.minX, true);
+    view.setFloat64(pos + 8, box.minY, true);
+    view.setFloat64(pos + 16, box.maxX, true);
+    view.setFloat64(pos + 24, box.maxY, true);
+    pos += 32;
+    view.setInt32(pos, pts.length, true);
+    pos += 4;
+    for (const p of pts) {
+      view.setFloat64(pos, p.x, true);
+      view.setFloat64(pos + 8, p.y, true);
+      pos += 16;
+    }
+    return new Uint8Array(buf);
+  }
+
   const buf = new ArrayBuffer(4);
   new DataView(buf).setInt32(0, 0, true);
   return new Uint8Array(buf);
@@ -225,10 +249,11 @@ function buildDbf(layer: VectorLayer): Uint8Array {
   const out = new Uint8Array(totalBytes);
   const view = new DataView(out.buffer);
 
+  const now = new Date();
   out[0] = 0x03;
-  out[1] = 26;
-  out[2] = 11;
-  out[3] = 20;
+  out[1] = Math.max(0, Math.min(255, now.getFullYear() - 1900));
+  out[2] = now.getMonth() + 1;
+  out[3] = now.getDate();
   view.setInt32(4, recordCount, true);
   view.setInt16(8, headerLength, true);
   view.setInt16(10, recordLength, true);

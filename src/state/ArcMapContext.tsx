@@ -76,6 +76,7 @@ export interface PendingFeatureDraft {
   geometry: Geometry;
   nextId: number;
   isPointCapture: boolean;
+  prefillAttributes?: Record<string, AttributeValue>;
 }
 
 function getExpectedGeometryForTool(tool: MapToolMode): GeometryType | null {
@@ -512,14 +513,18 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         index.build(activeLayer.features);
         const found = index.hitTest(tapPoint, tolerance);
         if (found) {
-          if (activeLayer.selectedFeatureIds.has(found.id)) {
-            activeLayer.selectedFeatureIds.delete(found.id);
+          const nextSel = new Set(activeLayer.selectedFeatureIds);
+          if (nextSel.has(found.id)) {
+            nextSel.delete(found.id);
           } else {
-            activeLayer.selectedFeatureIds.add(found.id);
+            nextSel.add(found.id);
           }
-          setStatusMessage(
-            `${activeLayer.selectedFeatureIds.size} seleccionados en ${activeLayer.name}`
+          setLayers((prev) =>
+            prev.map((l) =>
+              l.id === activeLayer.id ? { ...l, selectedFeatureIds: nextSel } : l
+            )
           );
+          setStatusMessage(`${nextSel.size} seleccionados en ${activeLayer.name}`);
           updateRender();
           return;
         }
@@ -532,15 +537,25 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const found = index.hitTest(tapPoint, tolerance);
         if (found) {
           setActiveLayerId(layer.id);
-          layer.selectedFeatureIds.clear();
-          layer.selectedFeatureIds.add(found.id);
+          const nextSel = new Set<number>([found.id]);
+          setLayers((prev) =>
+            prev.map((l) =>
+              l.id === layer.id ? { ...l, selectedFeatureIds: nextSel } : l
+            )
+          );
           setStatusMessage(`1 seleccionado en ${layer.name} (ID: ${found.id})`);
           updateRender();
           return;
         }
       }
 
-      layers.forEach((l) => l.selectedFeatureIds.clear());
+      setLayers((prev) =>
+        prev.map((l) =>
+          l.selectedFeatureIds.size > 0
+            ? { ...l, selectedFeatureIds: new Set<number>() }
+            : l
+        )
+      );
       setStatusMessage('Selección limpiada');
       updateRender();
     },
@@ -982,7 +997,9 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentBasemap((bm) => {
         if (
           next === ArcMapTheme.DARK &&
-          (bm === BasemapId.OPEN_STREET_MAP || bm === BasemapId.CARTO_POSITRON)
+          (bm === BasemapId.OPEN_STREET_MAP ||
+            bm === BasemapId.ESRI_STREETS ||
+            bm === BasemapId.CARTO_POSITRON)
         ) {
           return BasemapId.CARTO_DARK;
         }
@@ -1060,10 +1077,16 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const clearAllSelections = useCallback(() => {
-    layers.forEach((l) => l.selectedFeatureIds.clear());
+    setLayers((prev) =>
+      prev.map((l) =>
+        l.selectedFeatureIds.size > 0
+          ? { ...l, selectedFeatureIds: new Set<number>() }
+          : l
+      )
+    );
     setStatusMessage('Selección limpiada');
     updateRender();
-  }, [layers, updateRender]);
+  }, [updateRender]);
 
   const clearAllLayers = useCallback(() => {
     setLayers([]);
@@ -1080,44 +1103,60 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const selectFeatureInLayer = useCallback(
     (layerId: string, featureId: number, append = false) => {
-      const layer = layers.find((l) => l.id === layerId);
-      if (!layer) return;
-      if (!append) layer.selectedFeatureIds.clear();
-      layer.selectedFeatureIds.add(featureId);
+      setLayers((prev) =>
+        prev.map((l) => {
+          if (l.id !== layerId) return l;
+          const nextSel = append ? new Set(l.selectedFeatureIds) : new Set<number>();
+          nextSel.add(featureId);
+          return { ...l, selectedFeatureIds: nextSel };
+        })
+      );
       updateRender();
     },
-    [layers, updateRender]
+    [updateRender]
   );
 
   const deselectFeatureInLayer = useCallback(
     (layerId: string, featureId: number) => {
-      const layer = layers.find((l) => l.id === layerId);
-      if (!layer) return;
-      layer.selectedFeatureIds.delete(featureId);
+      setLayers((prev) =>
+        prev.map((l) => {
+          if (l.id !== layerId || !l.selectedFeatureIds.has(featureId)) return l;
+          const nextSel = new Set(l.selectedFeatureIds);
+          nextSel.delete(featureId);
+          return { ...l, selectedFeatureIds: nextSel };
+        })
+      );
       updateRender();
     },
-    [layers, updateRender]
+    [updateRender]
   );
 
   const selectAllInLayer = useCallback(
     (layerId: string) => {
-      const layer = layers.find((l) => l.id === layerId);
-      if (!layer) return;
-      layer.selectedFeatureIds.clear();
-      layer.features.forEach((f) => layer.selectedFeatureIds.add(f.id));
+      setLayers((prev) =>
+        prev.map((l) =>
+          l.id === layerId
+            ? { ...l, selectedFeatureIds: new Set(l.features.map((f) => f.id)) }
+            : l
+        )
+      );
       updateRender();
     },
-    [layers, updateRender]
+    [updateRender]
   );
 
   const clearLayerSelection = useCallback(
     (layerId: string) => {
-      const layer = layers.find((l) => l.id === layerId);
-      if (!layer) return;
-      layer.selectedFeatureIds.clear();
+      setLayers((prev) =>
+        prev.map((l) =>
+          l.id === layerId && l.selectedFeatureIds.size > 0
+            ? { ...l, selectedFeatureIds: new Set<number>() }
+            : l
+        )
+      );
       updateRender();
     },
-    [layers, updateRender]
+    [updateRender]
   );
 
   const ensureGpsWatchStarted = useCallback(() => {
@@ -1169,7 +1208,40 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setGpsAccuracy(acc);
       const target = activeLayer;
 
-      if (!target) {
+      if (!target || target.geometryType !== GeometryType.POINT) {
+        const existingGpsLayer = layers.find(
+          (l) => l.name === 'Puntos de Campo GPS' && l.geometryType === GeometryType.POINT
+        );
+        if (existingGpsLayer) {
+          const nextId =
+            existingGpsLayer.features.reduce((max, f) => Math.max(max, f.id), 0) + 1;
+          const newFeat: Feature = {
+            id: nextId,
+            geometry: gps,
+            attributes: {
+              ID: nextId,
+              NOMBRE: `GPS-${nextId}`,
+              PRECISION_M: acc ?? 0,
+              FECHA: new Date().toISOString().slice(0, 19).replace('T', ' '),
+              LONGITUD: lon,
+              LATITUD: lat,
+            },
+          };
+          setLayers((prev) =>
+            prev.map((l) =>
+              l.id === existingGpsLayer.id
+                ? { ...l, features: [...l.features, newFeat] }
+                : l
+            )
+          );
+          setActiveLayerId(existingGpsLayer.id);
+          setStatusMessage(
+            `✅ Punto GPS-${nextId} capturado en '${existingGpsLayer.name}' (±${acc ? Math.round(acc) : '?'}m)`
+          );
+          updateRender();
+          return;
+        }
+
         const fieldLayer = createVectorLayer({
           name: 'Puntos de Campo GPS',
           geometryType: GeometryType.POINT,
@@ -1202,33 +1274,24 @@ export const ArcMapProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
 
-      if (target.geometryType !== GeometryType.POINT) {
-        setStatusMessage(
-          `La capa activa '${target.name}' no es de tipo punto. Selecciona una capa de puntos en el TOC.`
-        );
-        return;
-      }
-
       const nextId = target.features.reduce((max, f) => Math.max(max, f.id), 0) + 1;
-      const newFeat: Feature = {
-        id: nextId,
+      setPendingFeatureDraft({
+        layerId: target.id,
         geometry: gps,
-        attributes: {
+        nextId,
+        isPointCapture: true,
+        prefillAttributes: {
           ID: nextId,
           NOMBRE: `GPS-${nextId}`,
           PRECISION_M: acc ?? 0,
           FECHA: new Date().toISOString().slice(0, 19).replace('T', ' '),
-          LONGITUD: lon,
-          LATITUD: lat,
+          LONGITUD: Number(lon.toFixed(6)),
+          LATITUD: Number(lat.toFixed(6)),
         },
-      };
-      setLayers((prev) =>
-        prev.map((l) => (l.id === target.id ? { ...l, features: [...l.features, newFeat] } : l))
-      );
+      });
       setStatusMessage(
-        `✅ Punto GPS-${nextId} capturado en '${target.name}' (±${acc ? Math.round(acc) : '?'}m)`
+        `🛰️ Ubicación GPS (±${acc ? Math.round(acc) : '?'}m) lista para guardar en '${target.name}'`
       );
-      updateRender();
     };
 
     ensureGpsWatchStarted();
@@ -1603,6 +1666,7 @@ declare global {
     AndroidBridge?: {
       saveBase64File: (filename: string, mimeType: string, base64Data: string) => void;
     };
+    __arcmapHandleBack?: () => boolean;
   }
 }
 

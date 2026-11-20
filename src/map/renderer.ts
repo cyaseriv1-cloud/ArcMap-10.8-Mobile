@@ -145,26 +145,32 @@ export class MapCanvasRenderer {
         const top = screenH / 2 + (mercCenter.y - tileTopMercY) / mpp;
         const bottom = screenH / 2 + (mercCenter.y - tileBottomMercY) / mpp;
 
-        const img = tileManager.getTile(basemap, z, tx, ty);
+        const img = tileManager.getTile(basemap, z, tx, ty, false);
         if (img && img.complete && img.naturalWidth > 0) {
           // Slight 0.6px overlap avoids hairline seams between tiles at fractional zoom
           ctx.drawImage(img, left, top, right - left + 0.6, bottom - top + 0.6);
+        }
+        if (basemap.overlayUrlTemplate) {
+          const ovImg = tileManager.getTile(basemap, z, tx, ty, true);
+          if (ovImg && ovImg.complete && ovImg.naturalWidth > 0) {
+            ctx.drawImage(ovImg, left, top, right - left + 0.6, bottom - top + 0.6);
+          }
         }
       }
     }
 
     if (basemap.attribution) {
       ctx.save();
-      ctx.font = 'bold 10px sans-serif';
+      ctx.font = 'bold 9.5px sans-serif';
       const metrics = ctx.measureText(basemap.attribution);
-      const padX = 6;
-      const boxW = metrics.width + padX * 2;
-      const rectLeft = screenW - boxW - 6;
-      const rectTop = screenH - 22;
-      ctx.fillStyle = isDarkMode ? 'rgba(22, 26, 33, 0.78)' : 'rgba(255, 255, 255, 0.78)';
-      ctx.fillRect(rectLeft, rectTop, boxW, 16);
+      const padX = 5;
+      const boxW = Math.min(metrics.width + padX * 2, Math.max(80, screenW - 92));
+      const rectLeft = 18;
+      const rectTop = screenH - 20;
+      ctx.fillStyle = isDarkMode ? 'rgba(22, 26, 33, 0.8)' : 'rgba(255, 255, 255, 0.82)';
+      ctx.fillRect(rectLeft, rectTop, boxW, 15);
       ctx.fillStyle = isDarkMode ? 'rgb(200, 210, 225)' : 'rgb(50, 50, 50)';
-      ctx.fillText(basemap.attribution, rectLeft + padX, rectTop + 12);
+      ctx.fillText(basemap.attribution, rectLeft + padX, rectTop + 11, boxW - padX * 2);
       ctx.restore();
     }
   }
@@ -259,7 +265,8 @@ export class MapCanvasRenderer {
         ctx.lineTo(sx, viewport.screenHeight);
         ctx.stroke();
 
-        if (sx - lastLonLabelX >= minLabelSpacingPx) {
+        const avoidsNorthArrow = sx < viewport.screenWidth - 78;
+        if (avoidsNorthArrow && sx - lastLonLabelX >= minLabelSpacingPx) {
           ctx.fillText(this.formatCoord(lon, false), sx + 4, 16);
           lastLonLabelX = sx;
         }
@@ -278,7 +285,8 @@ export class MapCanvasRenderer {
         ctx.lineTo(viewport.screenWidth, sy);
         ctx.stroke();
 
-        if (lastLatLabelY - sy >= minLabelSpacingPx) {
+        const avoidsScaleBar = sy < viewport.screenHeight - 64;
+        if (avoidsScaleBar && sy > 24 && lastLatLabelY - sy >= minLabelSpacingPx) {
           ctx.fillText(this.formatCoord(lat, true), 6, sy - 4);
           lastLatLabelY = sy;
         }
@@ -699,7 +707,7 @@ export class MapCanvasRenderer {
     const barWidthPx = niceMeters / groundMpp;
 
     const startX = 18;
-    const startY = viewport.screenHeight - 26;
+    const startY = viewport.screenHeight - 36;
     const barHeight = 7;
     const halfW = barWidthPx / 2;
 

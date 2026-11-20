@@ -12,7 +12,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Base64
-import android.view.KeyEvent
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -81,10 +80,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         webView = WebView(this)
+        webView.setBackgroundColor(0xFF161B22.toInt())
         setContentView(webView)
 
         ViewCompat.setOnApplyWindowInsetsListener(webView) { v, insets ->
-            val sysBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val sysBars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
+            )
             v.setPadding(sysBars.left, sysBars.top, sysBars.right, sysBars.bottom)
             insets
         }
@@ -99,6 +101,9 @@ class MainActivity : ComponentActivity() {
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
+        settings.userAgentString = settings.userAgentString
+            .replace("; wv", "")
+            .plus(" ArcMap10.8Mobile/1.0")
 
         webView.addJavascriptInterface(AndroidFileBridge(), "AndroidBridge")
 
@@ -170,10 +175,16 @@ class MainActivity : ComponentActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                webView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE))
-                webView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE))
-                if (webView.canGoBack()) {
-                    webView.goBack()
+                webView.evaluateJavascript(
+                    "(function(){return window.__arcmapHandleBack ? window.__arcmapHandleBack() : false;})()"
+                ) { result ->
+                    if (result != "true") {
+                        if (webView.canGoBack()) {
+                            webView.goBack()
+                        } else {
+                            moveTaskToBack(true)
+                        }
+                    }
                 }
             }
         })
